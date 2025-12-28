@@ -1,0 +1,109 @@
+[project]
+name = "cluster"
+version = "0.1.0"
+description = "Cluster analysis for psychiatric data"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "kmodes>=0.12.2",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.0",
+    "pandas>=2.3.3",
+    "pandera[pandas]>=0.27.1",
+    "pydantic>=2.12.5",
+    "scikit-learn>=1.8.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "ruff>=0.14.10",
+]
+
+[tool.ruff]
+# Set the maximum line length to 88 (Black's default)
+line-length = 88
+
+# Assume Python 3.14+ (adjust to your minimum supported version)
+target-version = "py314"
+
+[tool.ruff.lint]
+# Enable these rule sets
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "SIM",   # flake8-simplify
+    "PTH",   # flake8-use-pathlib
+]
+
+# Never automatically remove unused imports in __init__.py
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+    ".eggs",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore specific rules in test files
+"tests/**/*.py" = ["S101"]  # Allow assert statements in tests
+
+[tool.ruff.lint.isort]
+known-first-party = []  # Replace with your package name
+
+[tool.mypy]
+# Basic type checking
+python_version = "3.9"  # Match your target Python version
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+# Strictness options (start with these, can increase later)
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+# Error output
+show_error_codes = true
+show_column_numbers = true
+pretty = true
+
+# Exclude directories
+exclude = [
+    "venv",
+    ".venv",
+    "build",
+    "dist",
+]
+
+# Per-module options for third-party libraries without stubs
+[[tool.mypy.overrides]]
+module = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "sklearn",
+]
+ignore_missing_imports = true
