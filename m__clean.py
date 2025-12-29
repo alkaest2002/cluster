@@ -28,6 +28,15 @@ def _(df, pd):
     df.columns = df.columns.str.lower()
     df_clean = df.apply(lambda s: s.str.lower() if pd.api.types.is_string_dtype(s) else s)
 
+    ##################################################################################################################
+    # Drop unwanted columns
+    ##################################################################################################################
+
+
+
+    ##################################################################################################################
+    # Ensure categorical columns
+    ##################################################################################################################
 
     df_clean
     return (df_clean,)
@@ -35,7 +44,7 @@ def _(df, pd):
 
 @app.cell
 def _(DATAPATH, df_clean, name_of_file):
-    df_clean.to_csv(DATAPATH / f"{name_of_file}_clean.csv")
+    df_clean.to_parquet(DATAPATH / "out" / f"from_{name_of_file}_clean.parquet")
     return
 
 
