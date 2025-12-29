@@ -14,8 +14,8 @@ def _():
 
 @app.cell
 def _(DATAPATH, pd):
-    df = pd.read_pickle(DATAPATH / "out" / "pipe.pickle")
-    df
+    df = pd.read_feather(DATAPATH / "out" / "from_pipe.feather")
+    df["cat__cat_dept"].cat.categories
     return
 
 

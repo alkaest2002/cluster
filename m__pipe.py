@@ -34,6 +34,7 @@ def _():
 @app.cell
 def _(DATAPATH, pd):
     df = pd.read_csv(DATAPATH / "synth.csv")
+    df.head()
     return (df,)
 
 
@@ -56,57 +57,57 @@ def _(
     cat_cols = get_columns_indices_from_regex(df, "cat_")
     nom_cols = get_columns_indices_from_regex(df, "nom_")
 
+
     ####################################################################################################################################
-    # DEFINE PIPELINES
+    # DEFINE PIPELINES FOR DIFFERENT METRICS
     ####################################################################################################################################
-    num = Pipeline(
-        steps=[("scaler", StandardScaler())]
-    )
+    num_steps = [("scaler", StandardScaler())]
+    num = Pipeline(steps=num_steps)
     num_pipe =  ("num", num, num_cols)
 
-    cat = Pipeline(
-        steps=[("ord_encoder", OrdinalEncoder())]
-    )
+    cat_steps = [("ord_encoder", OrdinalEncoder())]
+    cat = Pipeline(steps=cat_steps)
     cat_pipe = ("cat", cat, cat_cols)
 
-    nom = Pipeline(steps=[
-        ("ohe_encoder", OneHotEncoder(sparse_output=False)),
-    ])
+    nom_steps = [("ohe_encoder", OneHotEncoder(sparse_output=False))]
+    nom = Pipeline(steps=nom_steps)
     nom_pipe = ("nom", nom, nom_cols)
 
 
     ####################################################################################################################################
     # DEFINE GENERAL PIPELINE
     ####################################################################################################################################
-
-    preprocessor = ColumnTransformer([ num_pipe, cat_pipe, nom_pipe])
-
+    preprocessor = ColumnTransformer([num_pipe, cat_pipe, nom_pipe])
     pipe = make_pipeline(preprocessor)
 
 
     ####################################################################################################################################
     # APPLY GENERAL PIPELINE
     ####################################################################################################################################
-
-    results = pipe.fit_transform(df)
+    transformed = pipe.fit_transform(df)
 
     # Access the categories/labels
     cat_encoder = preprocessor.named_transformers_['cat']['ord_encoder']
 
-    for i, col in enumerate(results.filter(regex=r"cat_")):
+    # Manage categorical metrics
+    for i, col in enumerate(transformed.filter(regex=r"cat_")):
        # Convert float to categorical
-        results[col] = pd.Categorical(results[col])
-        # Add additional categories
-        results[col] = results[col].cat.add_categories(cat_encoder.categories_[i])
+        transformed[col] = pd.Categorical(transformed[col])
+        # Add category labels
+        transformed[col] = transformed[col].cat.rename_categories(cat_encoder.categories_[i])
 
-
-    results.head()
-    return (results,)
+    transformed.head()
+    return (transformed,)
 
 
 @app.cell
-def _(DATAPATH, results):
-    results.to_pickle(DATAPATH / "out" / "pipe.pickle")
+def _(DATAPATH, transformed):
+    transformed.to_feather(DATAPATH / "out" / "from_pipe.feather")
+    return
+
+
+@app.cell
+def _():
     return
 
 
