@@ -13,3 +13,4 @@ wheels/
 /__marimo__
 /data
 /warehouse
+.DS_Store
