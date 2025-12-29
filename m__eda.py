@@ -4,20 +4,28 @@ __generated_with = "0.18.4"
 app = marimo.App(width="full")
 
 
-@app.cell
-def _():
-    import pandas as pd
+app._unparsable_cell(
+    r"""
     from pathlib import Path
-    from lib.utils import greet
+
+    import pandas as pd
+    import numpy as np
+
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import 
 
     from lib.paths import DATAPATH
-    return DATAPATH, pd
+    from lib.utils import get_columns_indices_from_regex
+
+    """,
+    name="_"
+)
 
 
 @app.cell
-def _(DATAPATH, pd):
+def _(DATAPATH, get_columns_indices_from_regex, pd):
     df = pd.read_csv(DATAPATH / "synth.csv")
-    df.head()
+    get_columns_indices_from_regex(df, r"num_")
     return
 
 
