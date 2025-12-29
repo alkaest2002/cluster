@@ -108,6 +108,14 @@ exclude = [
 
 # Per-module options for third-party libraries without stubs
 [[tool.mypy.overrides]]
-module = []
+module = [
+    "pandas",
+    "numpy",
+    "sklearn",
+    "matplotlib",
+    "seaborn",
+    "kmodes",
+    "umap",
+]
 ignore_missing_imports = true
 ignore_errors = true
