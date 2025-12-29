@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted
-from typing import Any, Dict, Hashable, List, Optional, Union
+from typing import Any, Hashable, TypeAlias 
 
-ArrayLike2D = Union[pd.DataFrame, np.ndarray, List[List[Any]]]
+ArrayLike2D: TypeAlias = pd.DataFrame | np.ndarray | list[list[Any]]
 
 
 class CardinalityAwareOrdinalEncoder(BaseEstimator, TransformerMixin):
@@ -62,18 +62,18 @@ class CardinalityAwareOrdinalEncoder(BaseEstimator, TransformerMixin):
         unknown_value: int = -1,
         dtype: type = np.int64,
     ) -> None:
-        self.low_card_threshold = low_card_threshold
-        self.medium_card_threshold = medium_card_threshold
-        self.min_frequency_pct = min_frequency_pct
-        self.min_absolute_count = min_absolute_count
-        self.high_card_top_n = high_card_top_n
-        self.high_card_freq_pct = high_card_freq_pct
-        self.handle_unknown = handle_unknown
-        self.unknown_value = unknown_value
-        self.dtype = dtype
+        self.low_card_threshold: int = low_card_threshold
+        self.medium_card_threshold: int = medium_card_threshold
+        self.min_frequency_pct: float = min_frequency_pct
+        self.min_absolute_count: int = min_absolute_count
+        self.high_card_top_n: int = high_card_top_n
+        self.high_card_freq_pct: float = high_card_freq_pct
+        self.handle_unknown: str = handle_unknown
+        self.unknown_value: int = unknown_value
+        self.dtype: type = dtype
 
     def fit(
-        self, X: ArrayLike2D, y: Optional[Any] = None
+        self, X: ArrayLike2D, y: Any | None = None
     ) -> "CardinalityAwareOrdinalEncoder":
         """Fit the encoder on training data.
 
@@ -85,16 +85,24 @@ class CardinalityAwareOrdinalEncoder(BaseEstimator, TransformerMixin):
         Returns:
             Fitted encoder instance.
         """
-        X_df = self._validate_input(X)
+        # Validate and convert input to DataFrame
+        X_df: pd.DataFrame = self._validate_input(X)
+        
+        # Get number of samples
         n_samples: int = len(X_df)
 
-        self.categories_: Dict[str, List[Hashable]] = {}
-        self.strategies_: Dict[str, str] = {}
-        self.encodings_: Dict[str, Dict[Hashable, int]] = {}
+        # Initialize storage for categories, strategies, and encodings
+        self.categories_: dict[str, list[Hashable]] = {}
+        self.strategies_: dict[str, str] = {}
+        self.encodings_: dict[str, dict[Hashable, int]] = {}
 
         # Determine strategies and encodings per feature
         for col_name in X_df.columns:
+            
+            # Compute unique count
             n_unique: int = int(X_df[col_name].nunique())
+            
+            # Compute value counts
             counts = X_df[col_name].value_counts()
 
             # Decide strategy based on cardinality
@@ -119,7 +127,7 @@ class CardinalityAwareOrdinalEncoder(BaseEstimator, TransformerMixin):
 
             # Create encoding dict
             if len(keep_categories) < n_unique:
-                encoding_dict: Dict[Hashable, int] = {cat: i + 1 for i, cat in enumerate(keep_categories)}
+                encoding_dict: dict[Hashable, int] = {cat: i + 1 for i, cat in enumerate(keep_categories)}
                 encoding_dict["__OTHER__"] = 0
             # All categories kept
             else:
@@ -143,19 +151,28 @@ class CardinalityAwareOrdinalEncoder(BaseEstimator, TransformerMixin):
         Returns:
             Ordinal-encoded array of shape (n_samples, n_features).
         """
+        # Check if fitted
         check_is_fitted(self)
-        X_df = self._validate_input(X)
 
-        X_transformed = np.empty((X_df.shape[0], X_df.shape[1]), dtype=self.dtype)
+        # Validate and convert input to DataFrame
+        X_df: pd.DataFrame = self._validate_input(X)
+
+        # Initialize output array
+        X_transformed: np.ndarray = np.empty((X_df.shape[0], X_df.shape[1]), dtype=self.dtype)
 
         # Apply encoding per feature
         for col_idx, col_name in enumerate(X_df.columns):
-            col_data = X_df[col_name].copy()
-            encoding_dict = self.encodings_[col_name]
 
+            # Get column data
+            col_data: pd.Series = X_df[col_name].copy()
+
+            # Get encoding dict
+            encoding_dict: dict[Hashable, int] = self.encodings_[col_name]
+            
             # Map unknown categories to "__OTHER__" if applicable
             if "__OTHER__" in encoding_dict:
-                mask_known = col_data.isin(self.categories_[col_name])
+                # Create mask for known categories
+                mask_known: pd.Series = col_data.isin(self.categories_[col_name])
                 col_data = col_data.where(mask_known, "__OTHER__")
 
             # Handle unknown categories
@@ -180,20 +197,33 @@ class CardinalityAwareOrdinalEncoder(BaseEstimator, TransformerMixin):
         Returns:
             DataFrame with original categories (with "__OTHER__" rendered as "other").
         """
+        # Check if fitted
         check_is_fitted(self)
 
+        # Convert input to numpy array
         X_arr = np.asarray(X)
+
+        # Initialize output DataFrame
         X_original = pd.DataFrame(index=range(X_arr.shape[0]), columns=self.feature_names_in_)
 
+        # Inverse map per feature
         for col_idx, col_name in enumerate(self.feature_names_in_):
-            reverse_encoding: Dict[int, Hashable] = {v: k for k, v in self.encodings_[col_name].items()}
+
+            # Create reverse encoding dict
+            reverse_encoding: dict[int, Hashable] = {v: k for k, v in self.encodings_[col_name].items()}
+
+            # Map encoded values back to original categories
             col_data = pd.Series(X_arr[:, col_idx])
+            
+            # Perform the mapping
             X_original[col_name] = col_data.map(reverse_encoding)
+            
+            # Replace unknown_value with NaN
             X_original[col_name] = X_original[col_name].replace("__OTHER__", "other")
 
         return X_original
 
-    def get_feature_names_out(self, input_features: Optional[List[str]] = None) -> np.ndarray:
+    def get_feature_names_out(self, input_features: list[str] | None = None) -> np.ndarray:
         """Get output feature names.
 
         Args:
@@ -223,19 +253,19 @@ class CardinalityAwareOrdinalEncoder(BaseEstimator, TransformerMixin):
             return X
 
         if hasattr(X, "shape") and len(getattr(X, "shape")) == 2:
-            X_arr = np.asarray(X)
+            X_arr: np.ndarray = np.asarray(X)
             return pd.DataFrame(X_arr, columns=[f"feature_{i}" for i in range(X_arr.shape[1])])
 
         raise ValueError("Input must be a 2D array-like structure")
 
-    def get_cardinality_info(self) -> Dict[str, Dict[str, Any]]:
+    def get_cardinality_info(self) -> dict[str, dict[str, Any]]:
         """Return cardinality strategy information per feature.
 
         Returns:
             Dict keyed by feature name with details about strategy and category counts.
         """
         check_is_fitted(self)
-        info: Dict[str, Dict[str, Any]] = {}
+        info: dict[str, dict[str, Any]] = {}
         for col_name in self.feature_names_in_:
             info[col_name] = {
                 "strategy": self.strategies_[col_name],
