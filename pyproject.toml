@@ -61,6 +61,7 @@ exclude = [
     "build",
     "dist",
     ".eggs",
+    "m__*.py"
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -72,7 +73,7 @@ known-first-party = []  # Replace with your package name
 
 [tool.mypy]
 # Basic type checking
-python_version = "3.9"  # Match your target Python version
+python_version = "3.14"  # Match your target Python version
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -91,20 +92,18 @@ show_error_codes = true
 show_column_numbers = true
 pretty = true
 
-# Exclude directories
+# Exclude 
 exclude = [
     "venv",
     ".venv",
     "build",
     "dist",
+    "(^|.*/)m__.*\\.py$"
 ]
+
 
 # Per-module options for third-party libraries without stubs
 [[tool.mypy.overrides]]
-module = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "sklearn",
-]
+module = []
 ignore_missing_imports = true
+ignore_errors = true
