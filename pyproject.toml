@@ -5,6 +5,7 @@ description = "Cluster analysis for psychiatric data"
 readme = "README.md"
 requires-python = "==3.10.*"
 dependencies = [
+    "category-encoders>=2.8.1",
     "fastparquet>=2025.12.0",
     "kmodes>=0.12.2",
     "marimo>=0.18.4",
