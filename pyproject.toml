@@ -5,12 +5,12 @@ description = "Cluster analysis for psychiatric data"
 readme = "README.md"
 requires-python = "==3.10.*"
 dependencies = [
-    "category-encoders>=2.8.1",
     "fastparquet>=2025.12.0",
     "kmodes>=0.12.2",
     "marimo>=0.18.4",
     "matplotlib>=3.10.8",
     "numpy>=2.2.6",
+    "openpyxl>=3.1.5",
     "orjson>=3.11.5",
     "pandas>=2.3.3",
     "pandera[pandas]>=0.27.1",
