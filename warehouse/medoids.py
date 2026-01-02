@@ -300,21 +300,16 @@ def plot_metrics(results_df: pd.DataFrame) -> None:
     Args:
         results_df: DataFrame containing 'k', 'inertia', and 'silhouette' columns.
     """
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-    
-    # Elbow Curve (Inertia)
-    ax1.plot(results_df['k'], results_df['inertia'], 'bo-')
-    ax1.set_title('Elbow Curve (Inertia)')
-    ax1.set_xlabel('Number of Clusters (k)')
-    ax1.set_ylabel('Inertia (Total Distance)')
-    ax1.grid(True)
-    
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     # Silhouette Score
-    ax2.plot(results_df['k'], results_df['silhouette'], 'ro-')
-    ax2.set_title('Silhouette Analysis')
-    ax2.set_xlabel('Number of Clusters (k)')
-    ax2.set_ylabel('Silhouette Score (Higher is better)')
-    ax2.grid(True)
+    max_silouhette_value = results_df['silhouette'].max()
+    best_n_clusters = results_df.loc[results_df['silhouette'] == max_silouhette_value, 'k'].values[0]
+    ax.plot(results_df['k'], results_df['silhouette'], 'ro-')
+    ax.set_title('Silhouette Analysis')
+    ax.set_xlabel('Number of Clusters (k)')
+    ax.set_ylabel('Silhouette Score (Higher is better)')
+    plt.axvline(best_n_clusters, color="r")
+    ax.grid(axis='y')
     
     plt.tight_layout()
     plt.show()
