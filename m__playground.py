@@ -7,6 +7,8 @@ app = marimo.App(width="full")
 @app.cell
 def _():
     # warehouse/medoids.py
+    from __future__ import annotations
+
     import numpy as np
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -15,21 +17,46 @@ def _():
     from kmedoids import KMedoids
     from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
     from sklearn.metrics import silhouette_score
+    from typing import Any
 
     warnings.filterwarnings("ignore")
 
+
     class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
+        """Computes the Gower Distance matrix for mixed-type data.
+    
+        This transformer calculates pairwise Gower distances between samples in a dataset
+        containing mixed-type features (numerical and categorical). Gower distance is
+        particularly useful for clustering heterogeneous data.
         """
-        Computes the Gower Distance matrix for mixed-type data.
-        """
-        def __init__(self, cat_features=None):
-            """
-            :param cat_features: List of column names or list of booleans indicating categorical cols.
+    
+        def __init__(self, cat_features: list[str] | list[int] | list[bool] | None = None) -> None:
+            """Initialize the GowerDistanceTransformer.
+        
+            Args:
+                cat_features: Specification of categorical features. Can be:
+                    - List of column names (for DataFrames)
+                    - List of column indices 
+                    - List of booleans indicating categorical columns
+                    - None to auto-detect object columns in DataFrames
             """
             self.cat_features = cat_features
-            self.cat_features_bool_ = None
+            self.cat_features_bool_: np.ndarray | None = None
+            self.n_features_: int | None = None
 
-        def fit(self, X, y=None):
+        def fit(self, X: pd.DataFrame | np.ndarray, y: Any = None) -> GowerDistanceTransformer:
+            """Fit the transformer to the data.
+        
+            Determines which features are categorical based on the cat_features parameter
+            or by auto-detecting object columns in DataFrames.
+        
+            Args:
+                X: Input data to fit the transformer on.
+                y: Ignored. Present for API consistency.
+            
+            Returns:
+                Self for method chaining.
+            """
             # If X is a DataFrame
             if isinstance(X, pd.DataFrame):
                 # Determine boolean mask for categorical features
@@ -57,7 +84,18 @@ def _():
             
             return self
 
-        def transform(self, X):
+        def transform(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+            """Transform the input data into a Gower distance matrix.
+        
+            Args:
+                X: Input data to transform into a distance matrix.
+            
+            Returns:
+                Square distance matrix of shape (n_samples, n_samples) with Gower distances.
+            
+            Raises:
+                RuntimeError: If Gower distance calculation fails.
+            """
             print(f"Computing Gower Distance Matrix for {X.shape[0]} samples...")
             try:
                 # Convert to DataFrame if needed
@@ -67,6 +105,7 @@ def _():
                 dist_matrix = gower.gower_matrix(X_df, cat_features=self.cat_features_bool_)
             
                 # Handle potential numerical instability
+                # Set 1.0 for any NaN distances, i.e., max distance
                 dist_matrix = np.nan_to_num(dist_matrix, nan=1.0)
 
                 # Ensure diagonal is zero
@@ -78,31 +117,75 @@ def _():
             except Exception as e:
                 raise RuntimeError(f"Gower calculation failed: {str(e)}")
 
-        def fit_transform(self, X, y=None):
+        def fit_transform(self, X: pd.DataFrame | np.ndarray, y: Any = None) -> np.ndarray:
+            """Fit the transformer and transform the data in one step.
+        
+            Args:
+                X: Input data to fit and transform.
+                y: Ignored. Present for API consistency.
+            
+            Returns:
+                Square distance matrix of shape (n_samples, n_samples) with Gower distances.
+            """
             return self.fit(X).transform(X)
 
 
     class KMedoidsWrapper(BaseEstimator, ClusterMixin):
+        """Wrapper for kmedoids-python to ensure Scikit-Learn compatibility.
+    
+        This wrapper provides a scikit-learn compatible interface for the kmedoids
+        clustering algorithm, particularly for use with precomputed distance matrices.
         """
-        Wrapper for kmedoids-python to ensure Scikit-Learn compatibility.
-        """
-        def __init__(self, n_clusters=3, method="fasterpam", init="build", max_iter=100, random_state=42):
+
+        def __init__(
+            self, 
+            n_clusters: int = 3, 
+            method: str = "fasterpam", 
+            init: str = "build", 
+            max_iter: int = 100, 
+            random_state: int = 42
+        ) -> None:
+            """Initialize the KMedoidsWrapper.
+        
+            Args:
+                n_clusters: Number of clusters to form.
+                method: Algorithm variant to use ('fasterpam', 'pam', etc.).
+                init: Initialization method for medoids selection.
+                max_iter: Maximum number of iterations.
+                random_state: Random state for reproducibility.
+            """
             self.n_clusters = n_clusters
             self.method = method
             self.init = init
             self.max_iter = max_iter
             self.random_state = random_state
+        
+            # Attributes set during fitting
+            self.kmedoids_: KMedoids | None = None
+            self.labels_: np.ndarray | None = None
+            self.medoid_indices_: np.ndarray | None = None
+            self.inertia_: float | None = None
+            self.cluster_centers_: None = None
 
-        def fit(self, X, y=None):
-            """
-            X must be a precomputed distance matrix.
+        def fit(self, X: np.ndarray, y: Any = None) -> KMedoidsWrapper:
+            """Fit the k-medoids clustering algorithm.
+        
+            Args:
+                X: Precomputed square distance matrix of shape (n_samples, n_samples).
+                y: Ignored. Present for API consistency.
+            
+            Returns:
+                Self for method chaining.
+            
+            Raises:
+                ValueError: If X is not a square matrix.
             """
             # Must be square matrix
             if X.shape[0] != X.shape[1]:
                 raise ValueError(f"Input must be a square distance matrix. Got shape {X.shape}.")
 
             try:
-                # Istantiate KMedoids model
+                # Instantiate KMedoids model
                 self.kmedoids_ = KMedoids(
                     n_clusters=self.n_clusters,
                     metric="precomputed",
@@ -128,15 +211,47 @@ def _():
             
             return self
 
-        def predict(self, X):
+        def predict(self, X: np.ndarray) -> np.ndarray:
+            """Predict the closest cluster for new samples.
+        
+            Args:
+                X: New samples to predict clusters for.
+            
+            Returns:
+                Cluster labels for the new samples.
+            
+            Raises:
+                AttributeError: If the model has not been fitted yet.
+            """
+            if self.kmedoids_ is None:
+                raise AttributeError("Model must be fitted before making predictions.")
             return self.kmedoids_.predict(X)
 
 
-    def run_optimization(df, k_min=2, k_max=50, cat_features=None):
-        """
-        1. Computes Distance Matrix (ONCE).
-        2. Iterates through k values.
-        3. Returns metrics for Elbow/Silhouette analysis.
+    def run_optimization(
+        df: pd.DataFrame, 
+        k_min: int = 2, 
+        k_max: int = 50, 
+        cat_features: list[str] | list[int] | list[bool] | None = None
+    ) -> tuple[KMedoidsWrapper, int, np.ndarray, pd.DataFrame]:
+        """Run k-medoids optimization across multiple k values.
+    
+        This function computes the Gower distance matrix once and then evaluates
+        k-medoids clustering for different numbers of clusters, using silhouette
+        score and inertia as evaluation metrics.
+    
+        Args:
+            df: Input DataFrame containing the data to cluster.
+            k_min: Minimum number of clusters to evaluate.
+            k_max: Maximum number of clusters to evaluate.
+            cat_features: Specification of categorical features for Gower distance.
+        
+        Returns:
+            Tuple containing:
+                - Best k-medoids model (highest silhouette score)
+                - Best number of clusters
+                - Computed distance matrix
+                - DataFrame with evaluation metrics for all k values
         """
         # 1. Compute Matrix
         transformer = GowerDistanceTransformer(cat_features=cat_features)
@@ -152,7 +267,7 @@ def _():
     
         # 2. Iterate
         for k in range(k_min, k_max + 1):
-            # Istantiate and fit model
+            # Instantiate and fit model
             model = KMedoidsWrapper(n_clusters=k, random_state=42)
             model.fit(dist_matrix)
         
@@ -184,30 +299,41 @@ def _():
         return best_model, best_k, dist_matrix, results_df
 
 
-    def plot_metrics(results_df):
-        """Plots Inertia and Silhouette scores side by side."""
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    def plot_metrics(results_df: pd.DataFrame) -> None:
+        """Plot inertia and silhouette scores for different k values.
     
-        # Elbow Curve (Inertia)
-        ax1.plot(results_df['k'], results_df['inertia'], 'bo-')
-        ax1.set_title('Elbow Curve (Inertia)')
-        ax1.set_xlabel('Number of Clusters (k)')
-        ax1.set_ylabel('Inertia (Total Distance)')
-        ax1.grid(True)
+        Creates side-by-side plots showing the elbow curve (inertia) and silhouette
+        analysis to help determine the optimal number of clusters.
     
+        Args:
+            results_df: DataFrame containing 'k', 'inertia', and 'silhouette' columns.
+        """
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         # Silhouette Score
-        ax2.plot(results_df['k'], results_df['silhouette'], 'ro-')
-        ax2.set_title('Silhouette Analysis')
-        ax2.set_xlabel('Number of Clusters (k)')
-        ax2.set_ylabel('Silhouette Score (Higher is better)')
-        ax2.grid(True)
+        max_silouhette_value = results_df['silhouette'].max()
+        best_n_clusters = results_df.loc[results_df['silhouette'] == max_silouhette_value, 'k'].values[0]
+        ax.plot(results_df['k'], results_df['silhouette'], 'ro-')
+        ax.set_title('Silhouette Analysis')
+        ax.set_xlabel('Number of Clusters (k)')
+        ax.set_ylabel('Silhouette Score (Higher is better)')
+        plt.axvline(best_n_clusters, color="r")
+        ax.grid(axis='y')
     
         plt.tight_layout()
         plt.show()
 
 
-    def analyze_medoids(df, model, dist_matrix):
-        """Prints the actual representative records (medoids)."""
+    def analyze_medoids(df: pd.DataFrame, model: KMedoidsWrapper, dist_matrix: np.ndarray) -> None:
+        """Analyze and print detailed information about the cluster medoids.
+    
+        Displays the overall silhouette score and detailed information about each
+        cluster including size and the actual medoid (representative sample).
+    
+        Args:
+            df: Original DataFrame containing the clustered data.
+            model: Fitted k-medoids model.
+            dist_matrix: Precomputed distance matrix used for clustering.
+        """
         print("\n" + "="*50)
         print("FINAL CLUSTER ANALYSIS")
         print("="*50)
@@ -231,7 +357,19 @@ def _():
             print(df.iloc[idx])
 
 
-    def create_sample_data(n_samples=300):
+    def create_sample_data(n_samples: int = 300) -> pd.DataFrame:
+        """Create sample mixed-type data for demonstration purposes.
+    
+        Generates a DataFrame with numerical and categorical features including
+        age, income, score, gender, membership level, and activity status.
+    
+        Args:
+            n_samples: Number of samples to generate.
+        
+        Returns:
+            DataFrame containing the generated sample data.
+        """
+        # Use random seed generator for reproducibility
         np.random.seed(42)
         data = {
             "age": np.random.randint(20, 70, n_samples),
@@ -268,6 +406,7 @@ def _():
 
         # 5. Show detailed results for the best model
         analyze_medoids(df, best_model, dist_matrix)
+
     return
 
 
