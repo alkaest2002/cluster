@@ -12,5 +12,4 @@ wheels/
 # Custom ignore patterns
 /__marimo__
 /data
-/warehouse
 .DS_Store
