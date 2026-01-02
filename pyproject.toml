@@ -7,6 +7,7 @@ requires-python = "==3.10.*"
 dependencies = [
     "fastparquet>=2025.12.0",
     "gower>=0.1.2",
+    "kmedoids>=0.5.4",
     "kmodes>=0.12.2",
     "marimo>=0.18.4",
     "matplotlib>=3.10.8",
