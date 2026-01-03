@@ -1,15 +1,17 @@
 # warehouse/medoids.py
 from __future__ import annotations
 
+import warnings
+from typing import Any
+
+import gower
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import gower
-import warnings
 from kmedoids import KMedoids
+from pandas import option_context
 from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 from sklearn.metrics import silhouette_score
-from typing import Any
 
 warnings.filterwarnings("ignore")
 
@@ -18,10 +20,11 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
     """Computes the Gower Distance matrix for mixed-type data.
     
     This transformer calculates pairwise Gower distances between samples in a dataset
-    containing mixed-type features (numerical and categorical). Gower distance is
+    containing mixed-typclear
+    e features (numerical and categorical). Gower distance is
     particularly useful for clustering heterogeneous data.
     """
-    
+
     def __init__(self, cat_features: list[str] | list[int] | list[bool] | None = None) -> None:
         """Initialize the GowerDistanceTransformer.
         
@@ -31,6 +34,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
                 - List of column indices 
                 - List of booleans indicating categorical columns
                 - None to auto-detect object columns in DataFrames
+
         """
         self.cat_features = cat_features
         self.cat_features_bool_: np.ndarray | None = None
@@ -48,6 +52,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             
         Returns:
             Self for method chaining.
+
         """
         # If X is a DataFrame
         if isinstance(X, pd.DataFrame):
@@ -73,7 +78,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
         else:
             # Fallback for numpy arrays (assumes cat_features is provided manually)
             self.cat_features_bool_ = np.array(self.cat_features, dtype=bool) if self.cat_features is not None else None
-            
+
         return self
 
     def transform(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -87,6 +92,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             
         Raises:
             RuntimeError: If Gower distance calculation fails.
+
         """
         print(f"Computing Gower Distance Matrix for {X.shape[0]} samples...")
         try:
@@ -95,7 +101,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
 
             # Compute Gower distance matrix
             dist_matrix = gower.gower_matrix(X_df, cat_features=self.cat_features_bool_)
-            
+
             # Handle potential numerical instability
             # Set 1.0 for any NaN distances, i.e., max distance
             dist_matrix = np.nan_to_num(dist_matrix, nan=1.0)
@@ -104,10 +110,10 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             np.fill_diagonal(dist_matrix, 0.0)
 
             return dist_matrix.astype(np.float32)
-            
+
         # Catch any errors during Gower calculation
         except Exception as e:
-            raise RuntimeError(f"Gower calculation failed: {str(e)}")
+            raise RuntimeError(f"Gower calculation failed: {e!s}")
 
     def fit_transform(self, X: pd.DataFrame | np.ndarray, y: Any = None) -> np.ndarray:
         """Fit the transformer and transform the data in one step.
@@ -118,6 +124,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             
         Returns:
             Square distance matrix of shape (n_samples, n_samples) with Gower distances.
+
         """
         return self.fit(X).transform(X)
 
@@ -130,11 +137,11 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
     """
 
     def __init__(
-        self, 
-        n_clusters: int = 3, 
-        method: str = "fasterpam", 
-        init: str = "build", 
-        max_iter: int = 100, 
+        self,
+        n_clusters: int = 3,
+        method: str = "fasterpam",
+        init: str = "build",
+        max_iter: int = 100,
         random_state: int = 42
     ) -> None:
         """Initialize the KMedoidsWrapper.
@@ -145,13 +152,14 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             init: Initialization method for medoids selection.
             max_iter: Maximum number of iterations.
             random_state: Random state for reproducibility.
+
         """
         self.n_clusters = n_clusters
         self.method = method
         self.init = init
         self.max_iter = max_iter
         self.random_state = random_state
-        
+
         # Attributes set during fitting
         self.kmedoids_: KMedoids | None = None
         self.labels_: np.ndarray | None = None
@@ -171,6 +179,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             
         Raises:
             ValueError: If X is not a square matrix.
+
         """
         # Must be square matrix
         if X.shape[0] != X.shape[1]:
@@ -189,18 +198,18 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
 
             # Fit model
             self.kmedoids_.fit(X)
-            
+
             # Store attributes
             self.labels_ = self.kmedoids_.labels_
             self.medoid_indices_ = self.kmedoids_.medoid_indices_
             self.inertia_ = self.kmedoids_.inertia_
             self.cluster_centers_ = None  # Not applicable for k-medoids
-            
+
         except Exception as e:
             print(f"Clustering failed for k={self.n_clusters}: {e}")
             self.labels_ = np.zeros(X.shape[0])
             self.inertia_ = np.inf
-            
+
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -214,6 +223,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             
         Raises:
             AttributeError: If the model has not been fitted yet.
+
         """
         if self.kmedoids_ is None:
             raise AttributeError("Model must be fitted before making predictions.")
@@ -221,9 +231,9 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
 
 
 def run_optimization(
-    df: pd.DataFrame, 
-    k_min: int = 2, 
-    k_max: int = 50, 
+    df: pd.DataFrame,
+    k_min: int = 2,
+    k_max: int = 50,
     cat_features: list[str] | list[int] | list[bool] | None = None
 ) -> tuple[KMedoidsWrapper, int, np.ndarray, pd.DataFrame]:
     """Run k-medoids optimization across multiple k values.
@@ -244,50 +254,50 @@ def run_optimization(
             - Best number of clusters
             - Computed distance matrix
             - DataFrame with evaluation metrics for all k values
+
     """
     # 1. Compute Matrix
     transformer = GowerDistanceTransformer(cat_features=cat_features)
     dist_matrix = transformer.fit_transform(df)
-    
+
     # Initialize vars
     results = []
     best_score = -1
     best_model = None
     best_k = 0
-    
+
     print(f"\nOptimizing clusters from k={k_min} to {k_max}...")
-    
+
     # 2. Iterate
     for k in range(k_min, k_max + 1):
+
         # Instantiate and fit model
         model = KMedoidsWrapper(n_clusters=k, random_state=42)
         model.fit(dist_matrix)
-        
+
         # Store labels
         labels = model.labels_
-        
+
         # Calculate Scores
         if len(np.unique(labels)) > 1:
             sil_score = silhouette_score(dist_matrix, labels, metric="precomputed")
         else:
             sil_score = -1.0
-            
+
         results.append({
             "k": k,
             "inertia": model.inertia_,
             "silhouette": sil_score
         })
-        
-        print(f"  k={k} | Silhouette: {sil_score:.4f} | Inertia: {model.inertia_:.2f}")
-        
+
         # Track best model
         if sil_score > best_score:
             best_score = sil_score
             best_model = model
             best_k = k
-            
+
     results_df = pd.DataFrame(results)
-    
+
     return best_model, best_k, dist_matrix, results_df
 
 
@@ -299,18 +309,19 @@ def plot_metrics(results_df: pd.DataFrame) -> None:
     
     Args:
         results_df: DataFrame containing 'k', 'inertia', and 'silhouette' columns.
+
     """
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     # Silhouette Score
-    max_silouhette_value = results_df['silhouette'].max()
-    best_n_clusters = results_df.loc[results_df['silhouette'] == max_silouhette_value, 'k'].values[0]
-    ax.plot(results_df['k'], results_df['silhouette'], 'ro-')
-    ax.set_title('Silhouette Analysis')
-    ax.set_xlabel('Number of Clusters (k)')
-    ax.set_ylabel('Silhouette Score (Higher is better)')
+    max_silouhette_value = results_df["silhouette"].max()
+    best_n_clusters = results_df.loc[results_df["silhouette"] == max_silouhette_value, "k"].values[0]
+    ax.plot(results_df["k"], results_df["silhouette"], "ro-")
+    ax.set_title("Silhouette Analysis")
+    ax.set_xlabel("Number of Clusters (k)")
+    ax.set_ylabel("Silhouette Score (Higher is better)")
     plt.axvline(best_n_clusters, color="r")
-    ax.grid(axis='y')
-    
+    ax.grid(axis="y")
+
     plt.tight_layout()
     plt.show()
 
@@ -325,28 +336,25 @@ def analyze_medoids(df: pd.DataFrame, model: KMedoidsWrapper, dist_matrix: np.nd
         df: Original DataFrame containing the clustered data.
         model: Fitted k-medoids model.
         dist_matrix: Precomputed distance matrix used for clustering.
+
     """
     print("\n" + "="*50)
     print("FINAL CLUSTER ANALYSIS")
     print("="*50)
-    
+
     labels = model.labels_
     medoid_indices = model.medoid_indices_
-    
+
     # Global score
-    score = silhouette_score(dist_matrix, labels, metric='precomputed')
+    score = silhouette_score(dist_matrix, labels, metric="precomputed")
     print(f"Overall Silhouette Score: {score:.4f}")
-    
+
+    # Add cluster size
     df_analysis = df.copy()
-    df_analysis['Cluster'] = labels
-    
-    for i, idx in enumerate(medoid_indices):
-        cluster_size = np.sum(labels == i)
-        print(f"\nCluster {i} (Size: {cluster_size})")
-        print(f"Medoid (Representative Profile):")
-        print("-" * 30)
-        # Print the row corresponding to the medoid
-        print(df.iloc[idx])
+    df_analysis["cluster"] = labels
+    df_analysis = df_analysis.assign(cluster_size=df_analysis.groupby("cluster").transform("size"))
+
+    return df_analysis.iloc[medoid_indices]
 
 
 def create_sample_data(n_samples: int = 300) -> pd.DataFrame:
@@ -360,6 +368,7 @@ def create_sample_data(n_samples: int = 300) -> pd.DataFrame:
         
     Returns:
         DataFrame containing the generated sample data.
+
     """
     # Use random seed generator for reproducibility
     np.random.seed(42)
@@ -379,16 +388,16 @@ if __name__ == "__main__":
     df = create_sample_data(300)
     print("Data Sample:")
     print(df.head())
-    
+
     # 2. Identify Categorical Columns (Optional, Gower can auto-detect, but being explicit is safer)
     cat_cols = ["gender", "membership", "active"]
-    
+
     # 3. Run Optimization (Calculates Matrix Once -> Loops k)
     best_model, best_k, dist_matrix, results_df = run_optimization(df, cat_features=cat_cols)
 
     # print best k
     print(f"\nBest number of clusters (k): {best_k}")
-    
+
     # 4. Visualization
     # Note: If running in a non-GUI environment (like some servers), comment this out.
     try:
@@ -397,4 +406,7 @@ if __name__ == "__main__":
         print("Skipping plotting (GUI not available)")
 
     # 5. Show detailed results for the best model
-    analyze_medoids(df, best_model, dist_matrix)
+    medoids = analyze_medoids(df, best_model, dist_matrix)
+
+    with option_context("display.max_rows", 50, "display.max_columns", 100):
+        print(medoids)
