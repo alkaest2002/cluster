@@ -144,7 +144,8 @@ module = [
     "sklearn.*",
     "matplotlib.*",
     "seaborn.*",
-    "kmodes.*",
+    "kmedoids.*",
+    "gower.*",
     "umap.*",
 ]
 ignore_missing_imports = true
