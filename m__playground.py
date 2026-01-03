@@ -15,6 +15,7 @@ def _():
     import gower
     import warnings
     from kmedoids import KMedoids
+    from pandas import option_context
     from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
     from sklearn.metrics import silhouette_score
     from typing import Any
@@ -267,6 +268,7 @@ def _():
     
         # 2. Iterate
         for k in range(k_min, k_max + 1):
+        
             # Instantiate and fit model
             model = KMedoidsWrapper(n_clusters=k, random_state=42)
             model.fit(dist_matrix)
@@ -285,8 +287,6 @@ def _():
                 "inertia": model.inertia_,
                 "silhouette": sil_score
             })
-        
-            print(f"  k={k} | Silhouette: {sil_score:.4f} | Inertia: {model.inertia_:.2f}")
         
             # Track best model
             if sil_score > best_score:
@@ -345,17 +345,13 @@ def _():
         score = silhouette_score(dist_matrix, labels, metric='precomputed')
         print(f"Overall Silhouette Score: {score:.4f}")
     
+        # Add cluster size
         df_analysis = df.copy()
-        df_analysis['Cluster'] = labels
-    
-        for i, idx in enumerate(medoid_indices):
-            cluster_size = np.sum(labels == i)
-            print(f"\nCluster {i} (Size: {cluster_size})")
-            print(f"Medoid (Representative Profile):")
-            print("-" * 30)
-            # Print the row corresponding to the medoid
-            print(df.iloc[idx])
+        df_analysis['cluster'] = labels
+        df_analysis = df_analysis.assign(cluster_size=df_analysis.groupby("cluster").transform("size"))
 
+        return df_analysis.iloc[medoid_indices]
+    
 
     def create_sample_data(n_samples: int = 300) -> pd.DataFrame:
         """Create sample mixed-type data for demonstration purposes.
@@ -405,7 +401,10 @@ def _():
             print("Skipping plotting (GUI not available)")
 
         # 5. Show detailed results for the best model
-        analyze_medoids(df, best_model, dist_matrix)
+        medoids = analyze_medoids(df, best_model, dist_matrix)
+
+        with option_context('display.max_rows', 50, 'display.max_columns', 100):
+            print(medoids)
 
     return
 
