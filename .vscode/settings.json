@@ -1,0 +1,12 @@
+{
+    "ruff.nativeServer": true,
+    "ruff.enable": true,
+    "ruff.organizeImports": true,
+    "ruff.fixAll": true,
+    "ruff.codeAction.fixViolation.enable": true,
+    "ruff.codeAction.disableRuleComment.enable": true,
+    "ruff.path": ["/Users/ak2002/Documents/automata/cluster/.venv/bin/ruff"],
+    "ruff.interpreter": ["/Users/ak2002/Documents/automata/cluster/.venv/bin/python"],
+    "ruff.format.preview": true,
+    "ruff.lint.preview": true
+}
