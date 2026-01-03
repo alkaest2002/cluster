@@ -1,21 +1,26 @@
+import warnings
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from kmodes.kprototypes import KPrototypes
+from sklearn.metrics import (
+   calinski_harabasz_score,
+   davies_bouldin_score,
+   silhouette_score,
+)
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
-import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 # ===== STEP 1: Prepare Data for K-Prototypes =====
 def prepare_data_for_kprototypes(df):
-   """
-   Prepare mixed data for K-Prototypes clustering.
+   """Prepare mixed data for K-Prototypes clustering.
    K-Prototypes keeps categorical features as-is and only scales numerical features.
    """
    # Separate numerical and categorical columns
-   numerical_cols = df.select_dtypes(exclude='object').columns.tolist()
-   categorical_cols = df.select_dtypes(include='object').columns.tolist()
+   numerical_cols = df.select_dtypes(exclude="object").columns.tolist()
+   categorical_cols = df.select_dtypes(include="object").columns.tolist()
 
    print(f"Numerical features: {len(numerical_cols)}")
    print(f"Categorical features: {len(categorical_cols)}")
@@ -33,8 +38,7 @@ def prepare_data_for_kprototypes(df):
 
 # ===== STEP 2: Find Optimal Number of Clusters =====
 def find_optimal_clusters(data, categorical_indices, k_range=range(2, 11), n_init=10):
-   """
-   Use elbow method (cost) and silhouette score to find optimal k.
+   """Use elbow method (cost) and silhouette score to find optimal k.
    """
    costs = []
    silhouettes = []
@@ -42,7 +46,7 @@ def find_optimal_clusters(data, categorical_indices, k_range=range(2, 11), n_ini
    for k in k_range:
        print(f"Testing k={k}...")
 
-       kproto = KPrototypes(n_clusters=k, init='Huang', n_init=n_init, verbose=0, random_state=42)
+       kproto = KPrototypes(n_clusters=k, init="Huang", n_init=n_init, verbose=0, random_state=42)
        clusters = kproto.fit_predict(data, categorical=categorical_indices)
 
        costs.append(kproto.cost_)
@@ -60,18 +64,18 @@ def find_optimal_clusters(data, categorical_indices, k_range=range(2, 11), n_ini
    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
    # Elbow plot
-   ax1.plot(k_range, costs, 'bo-', linewidth=2, markersize=8)
-   ax1.set_xlabel('Number of Clusters (k)', fontsize=12)
-   ax1.set_ylabel('Cost (Within-Cluster Sum of Distances)', fontsize=12)
-   ax1.set_title('Elbow Method', fontsize=14, fontweight='bold')
+   ax1.plot(k_range, costs, "bo-", linewidth=2, markersize=8)
+   ax1.set_xlabel("Number of Clusters (k)", fontsize=12)
+   ax1.set_ylabel("Cost (Within-Cluster Sum of Distances)", fontsize=12)
+   ax1.set_title("Elbow Method", fontsize=14, fontweight="bold")
    ax1.grid(True, alpha=0.3)
 
    # Silhouette plot
    if None not in silhouettes:
-       ax2.plot(k_range, silhouettes, 'ro-', linewidth=2, markersize=8)
-       ax2.set_xlabel('Number of Clusters (k)', fontsize=12)
-       ax2.set_ylabel('Silhouette Score', fontsize=12)
-       ax2.set_title('Silhouette Score by k', fontsize=14, fontweight='bold')
+       ax2.plot(k_range, silhouettes, "ro-", linewidth=2, markersize=8)
+       ax2.set_xlabel("Number of Clusters (k)", fontsize=12)
+       ax2.set_ylabel("Silhouette Score", fontsize=12)
+       ax2.set_title("Silhouette Score by k", fontsize=14, fontweight="bold")
        ax2.grid(True, alpha=0.3)
 
    plt.tight_layout()
@@ -82,10 +86,9 @@ def find_optimal_clusters(data, categorical_indices, k_range=range(2, 11), n_ini
 
 # ===== STEP 3: Fit K-Prototypes with Optimal k =====
 def fit_kprototypes(data, categorical_indices, n_clusters=5, n_init=10):
+   """Fit K-Prototypes model with specified number of clusters.
    """
-   Fit K-Prototypes model with specified number of clusters.
-   """
-   kproto = KPrototypes(n_clusters=n_clusters, init='Huang', n_init=n_init,
+   kproto = KPrototypes(n_clusters=n_clusters, init="Huang", n_init=n_init,
                        verbose=1, random_state=42)
 
    clusters = kproto.fit_predict(data, categorical=categorical_indices)
@@ -95,8 +98,7 @@ def fit_kprototypes(data, categorical_indices, n_clusters=5, n_init=10):
 
 # ===== STEP 4: Evaluate Cluster Quality =====
 def evaluate_clusters(data, clusters, categorical_indices, numerical_cols):
-   """
-   Comprehensive cluster quality evaluation.
+   """Comprehensive cluster quality evaluation.
    """
    print("\n" + "="*60)
    print("CLUSTER QUALITY METRICS")
@@ -104,7 +106,7 @@ def evaluate_clusters(data, clusters, categorical_indices, numerical_cols):
 
    # Basic cluster statistics
    unique, counts = np.unique(clusters, return_counts=True)
-   print(f"\nCluster sizes:")
+   print("\nCluster sizes:")
    for cluster_id, count in zip(unique, counts):
        print(f"  Cluster {cluster_id}: {count} samples ({count/len(clusters)*100:.1f}%)")
 
@@ -133,20 +135,19 @@ def evaluate_clusters(data, clusters, categorical_indices, numerical_cols):
    print("\n" + "="*60)
 
    return {
-       'silhouette': sil_score if len(numerical_data.columns) > 1 else None,
-       'davies_bouldin': db_score if len(numerical_data.columns) > 1 else None,
-       'calinski_harabasz': ch_score if len(numerical_data.columns) > 1 else None,
-       'cluster_sizes': dict(zip(unique, counts))
+       "silhouette": sil_score if len(numerical_data.columns) > 1 else None,
+       "davies_bouldin": db_score if len(numerical_data.columns) > 1 else None,
+       "calinski_harabasz": ch_score if len(numerical_data.columns) > 1 else None,
+       "cluster_sizes": dict(zip(unique, counts))
    }
 
 
 # ===== STEP 5: Analyze Cluster Characteristics =====
 def analyze_clusters(data, clusters, numerical_cols, categorical_cols):
-   """
-   Provide detailed cluster profiling.
+   """Provide detailed cluster profiling.
    """
    df_with_clusters = data.copy()
-   df_with_clusters['Cluster'] = clusters
+   df_with_clusters["Cluster"] = clusters
 
    print("\n" + "="*60)
    print("CLUSTER CHARACTERISTICS")
@@ -155,23 +156,22 @@ def analyze_clusters(data, clusters, numerical_cols, categorical_cols):
    # Numerical features by cluster
    if len(numerical_cols) > 0:
        print("\nNumerical Features by Cluster (mean values):")
-       print(df_with_clusters.groupby('Cluster')[numerical_cols].mean().round(3))
+       print(df_with_clusters.groupby("Cluster")[numerical_cols].mean().round(3))
 
    # Categorical features by cluster
    if len(categorical_cols) > 0:
        print("\n\nCategorical Features by Cluster (mode values):")
        for col in categorical_cols:
            print(f"\n{col}:")
-           mode_per_cluster = df_with_clusters.groupby('Cluster')[col].agg(lambda x: x.mode()[0] if len(x.mode()) > 0 else None)
+           mode_per_cluster = df_with_clusters.groupby("Cluster")[col].agg(lambda x: x.mode()[0] if len(x.mode()) > 0 else None)
            print(mode_per_cluster)
 
    return df_with_clusters
 
 
 # ===== STEP 6: Visualize Clusters =====
-def visualize_clusters(data, clusters, categorical_indices, method='umap'):
-   """
-   Visualize clusters using dimensionality reduction.
+def visualize_clusters(data, clusters, categorical_indices, method="umap"):
+   """Visualize clusters using dimensionality reduction.
    """
    from sklearn.decomposition import PCA
 
@@ -183,7 +183,7 @@ def visualize_clusters(data, clusters, categorical_indices, method='umap'):
        return
 
    # Reduce to 2D
-   if method == 'pca' or len(numerical_data.columns) > 50:
+   if method == "pca" or len(numerical_data.columns) > 50:
        reducer = PCA(n_components=2, random_state=42)
        embedding = reducer.fit_transform(numerical_data)
        explained_var = sum(reducer.explained_variance_ratio_) * 100
@@ -204,13 +204,13 @@ def visualize_clusters(data, clusters, categorical_indices, method='umap'):
    # Create visualization
    plt.figure(figsize=(12, 8))
    scatter = plt.scatter(embedding[:, 0], embedding[:, 1],
-                        c=clusters, cmap='tab10',
-                        s=50, alpha=0.6, edgecolors='black', linewidth=0.5)
-   plt.colorbar(scatter, label='Cluster')
-   plt.xlabel('Dimension 1', fontsize=12)
-   plt.ylabel('Dimension 2', fontsize=12)
-   plt.title(f'K-Prototypes Clusters Visualization {title_suffix}',
-             fontsize=14, fontweight='bold')
+                        c=clusters, cmap="tab10",
+                        s=50, alpha=0.6, edgecolors="black", linewidth=0.5)
+   plt.colorbar(scatter, label="Cluster")
+   plt.xlabel("Dimension 1", fontsize=12)
+   plt.ylabel("Dimension 2", fontsize=12)
+   plt.title(f"K-Prototypes Clusters Visualization {title_suffix}",
+             fontsize=14, fontweight="bold")
    plt.grid(True, alpha=0.3)
    plt.tight_layout()
    plt.show()
@@ -226,13 +226,13 @@ if __name__ == "__main__":
    n_samples = 1000
 
    sample_data = pd.DataFrame({
-       'revenue': np.random.exponential(100, n_samples),
-       'visits': np.random.poisson(10, n_samples),
-       'avg_session_duration': np.random.gamma(2, 30, n_samples),
-       'bounce_rate': np.random.beta(2, 5, n_samples),
-       'device': np.random.choice(['mobile', 'desktop', 'tablet'], n_samples),
-       'channel': np.random.choice(['organic', 'paid', 'social', 'direct'], n_samples),
-       'region': np.random.choice(['North', 'South', 'East', 'West'], n_samples)
+       "revenue": np.random.exponential(100, n_samples),
+       "visits": np.random.poisson(10, n_samples),
+       "avg_session_duration": np.random.gamma(2, 30, n_samples),
+       "bounce_rate": np.random.beta(2, 5, n_samples),
+       "device": np.random.choice(["mobile", "desktop", "tablet"], n_samples),
+       "channel": np.random.choice(["organic", "paid", "social", "direct"], n_samples),
+       "region": np.random.choice(["North", "South", "East", "West"], n_samples)
    })
 
    print("\n1. Preparing data...")
@@ -251,6 +251,6 @@ if __name__ == "__main__":
    df_clustered = analyze_clusters(sample_data, clusters, num_cols, cat_cols)
 
    print("\n6. Visualizing clusters...")
-   visualize_clusters(data_scaled, clusters, cat_indices, method='pca')
+   visualize_clusters(data_scaled, clusters, cat_indices, method="pca")
 
    print("\n✓ Clustering complete! Check the plots and metrics above.")
