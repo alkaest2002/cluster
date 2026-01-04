@@ -73,7 +73,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
                 raise ValueError(error_msg)
 
             # If any specified categorical features are not of object dtype
-            if pd.Index(self.cat_features).isin(x.select_dtypes(include=["object"]).columns).all():
+            if not pd.Index(self.cat_features).isin(x.select_dtypes(include=["object"]).columns).all():
                 # Get list of non-object dtype features
                 non_object_features = [feat for feat in self.cat_features if x[feat].dtype != "object"]
                 # Set error message
