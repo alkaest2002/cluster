@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,22 +33,78 @@ class KMedoidsAnalyzer:
         Attributes:
             transformer: GowerDistanceTransformer instance.
             best_model_: Best k-medoids model found during optimization.
-            best_k_: Best number of clusters found during optimization.
+            best_n_clusters_: Best number of clusters found during optimization.
             dist_matrix_: Computed Gower distance matrix.
             results_df_: DataFrame containing optimization results.
 
         """
         self.transformer: GowerDistanceTransformer = GowerDistanceTransformer(cat_features=cat_features)
         self.best_model_: KMedoidsWrapper | None = None
-        self.best_k_: int | None = None
+        self.best_n_clusters_: int | None = None
         self.dist_matrix_: NDArray[np.float32] | None = None
         self.results_df_: pd.DataFrame | None = None
+
+    @staticmethod
+    def validate_dataframe_(df: pd.DataFrame) -> None:
+        """Validate that the DataFrame contains only supported dtypes.
+
+        Args:
+            df: DataFrame to validate.
+
+        Raises:
+            TypeError: If unsupported dtypes are found in the DataFrame.
+
+        """
+        # Identify unsupported dtypes
+        unsupported_dtypes: pd.DataFrame = df.select_dtypes(exclude=["number", "object", "bool"])
+        # If any unsupported dtypes are found
+        if not unsupported_dtypes.empty:
+            # Set error message
+            error_msg: str = f"Unsupported Dtypes in DataFrame: {unsupported_dtypes.dtypes.to_dict()}"
+            # Raise TypeError
+            raise TypeError(error_msg)
+
+    @staticmethod
+    def fit_model_(
+        n_clusters: int,
+        dist_matrix: NDArray[np.float32],
+        random_state: int = 42
+    ) -> dict[str, Any]:
+        """Fit the k-medoids model.
+
+        Args:
+            n_clusters: Number of clusters.
+            dist_matrix: Precomputed distance matrix.
+            random_state: Random state for reproducibility.
+
+        Returns:
+            Dictionary with n_clusters, inertia, and silhouette score.
+
+        """
+        # Instantiate model
+        model: KMedoidsWrapper = KMedoidsWrapper(n_clusters=n_clusters, random_state=random_state)
+        # Fit model
+        model.fit(dist_matrix)
+        # Store labels
+        labels: NDArray[np.int_] | None = model.labels_
+        # Calculate Scores
+        if labels is not None and len(np.unique(labels)) > 1:
+            sil_score: float = silhouette_score(dist_matrix, labels, metric="precomputed")
+        else:
+            sil_score = -1.0
+        # Return results
+        return {
+            "n_clusters": n_clusters,
+            "model": model,
+            "inertia": model.inertia_,
+            "silhouette": sil_score
+        }
 
     def run_optimization(
         self,
         df: pd.DataFrame,
-        k_min: int = 2,
-        k_max: int = 50
+        n_clusters_min: int = 2,
+        n_clusters_max: int = 50
     ) -> tuple[KMedoidsWrapper, int, NDArray[np.float32], pd.DataFrame]:
         """Run k-medoids optimization across multiple k values.
 
@@ -58,8 +114,8 @@ class KMedoidsAnalyzer:
 
         Args:
             df: Input DataFrame containing the data to cluster.
-            k_min: Minimum number of clusters to evaluate.
-            k_max: Maximum number of clusters to evaluate.
+            n_clusters_min: Minimum number of clusters to evaluate.
+            n_clusters_max: Maximum number of clusters to evaluate.
 
         Returns:
             Tuple containing:
@@ -69,61 +125,33 @@ class KMedoidsAnalyzer:
                 - DataFrame with evaluation metrics for all k values
 
         """
-        # Validate DataFrame dtypes
-        unsupported_dtypes: pd.DataFrame = df.select_dtypes(exclude=["number", "object", "bool"])
-        if not unsupported_dtypes.empty:
-            error_msg: str = f"Unsupported Dtypes in DataFrame: {unsupported_dtypes.dtypes.to_dict()}"
-            raise TypeError(error_msg)
+        # Validate DataFrame
+        self.validate_dataframe_(df)
 
-        # 1. Compute Matrix
+        # 1. Compute Gower distance matrix once
         self.dist_matrix_ = self.transformer.fit_transform(df)
 
         # Initialize vars
         results: list[dict[str, int | float | None]] = []
-        best_score: float = -1
-        best_model: KMedoidsWrapper | None = None
-        best_k: int = 0
 
-        # 2. Iterate over k values
-        for k in range(k_min, k_max + 1):
+        # 2. Iterate over n_clusters values
+        for n_clusters in range(n_clusters_min, n_clusters_max + 1):
 
-            # Instantiate and fit model
-            model: KMedoidsWrapper = KMedoidsWrapper(n_clusters=k, random_state=42)
-            model.fit(self.dist_matrix_)
+            # Fit model
+            model: dict[str, Any] = self.fit_model_(n_clusters=n_clusters, dist_matrix=self.dist_matrix_)
 
-            # Store labels
-            labels: NDArray[np.int_] | None = model.labels_
+            # Append to results list
+            results.append(model)
 
-            # Calculate Scores
-            if labels is not None and len(np.unique(labels)) > 1:
-                sil_score: float = silhouette_score(self.dist_matrix_, labels, metric="precomputed")
-            else:
-                sil_score = -1.0
-
-            results.append({
-                "k": k,
-                "inertia": model.inertia_,
-                "silhouette": sil_score
-            })
-
-            # Track best model
-            if sil_score > best_score:
-                best_score = sil_score
-                best_model = model
-                best_k = k
-
+        # Convert results to DataFrame
         self.results_df_ = pd.DataFrame(results)
 
-        # Ensure best_model is not None before returning
-        if best_model is None:
-            best_model = KMedoidsWrapper(n_clusters=k_min, random_state=42)
-            best_model.fit(self.dist_matrix_)
+        # Find index of max silhouette score
+        best_model_idx: int = self.results_df_["silhouette"].idxmax()
+        self.best_model_ = self.results_df_.loc[best_model_idx, "model"]
+        self.best_n_clusters_ = self.results_df_.loc[best_model_idx, "n_clusters"]
 
-        # Store best results
-        self.best_model_ = best_model
-        self.best_k_ = best_k
-
-        return best_model, best_k, self.dist_matrix_, self.results_df_
+        return self.best_model_, self.best_n_clusters_, self.dist_matrix_, self.results_df_.drop(columns=["model"])
 
     def plot_metrics(self, results_df: pd.DataFrame | None = None) -> str:
         """Plot silhouette scores for different k values.
@@ -150,15 +178,15 @@ class KMedoidsAnalyzer:
         max_silhouette_value: float = results_df["silhouette"].max()
 
         # Get best n_clusters corresponding to max silhouette score
-        best_n_clusters_series: pd.Series[int] = results_df.loc[results_df["silhouette"] == max_silhouette_value, "k"]
+        best_n_clusters_series: pd.Series[int] = results_df.loc[results_df["silhouette"] == max_silhouette_value, "n_clusters"]
 
         # There could be multiple k with the same max silhouette, take the first one
         best_n_clusters: int = best_n_clusters_series.values[0]
 
         # Plot silhouette scores
-        ax.plot(results_df["k"], results_df["silhouette"], "ro-")
+        ax.plot(results_df["n_clusters"], results_df["silhouette"], "ro-")
         ax.set_title("Silhouette Analysis")
-        ax.set_xlabel("Number of Clusters (k)")
+        ax.set_xlabel("Number of Clusters (n_clusters)")
         ax.set_ylabel("Silhouette Score (Higher is better)")
         ax.axvline(best_n_clusters, color="r")
         ax.grid(axis="y")
