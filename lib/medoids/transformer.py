@@ -27,7 +27,10 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
 
         Args:
             cat_features: Specification of categorical features by their column names.
-            cat_feateurs_bool_: Internal boolean mask for categorical features.
+
+        Attributes:
+            cat_features: List of categorical feature names.
+            cat_features_bool_: Boolean mask indicating which features are categorical.
 
         """
         self.cat_features: list[str] | None = cat_features
@@ -47,19 +50,37 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             Self for method chaining.
 
         Raises:
-            TypeError: If input x is not a pandas DataFrame.
+            ValueError: If specified categorical features are not found in DataFrame.
+            TypeError: If specified categorical features are not of object dtype.
 
         """
-        # Raise error if x is not a DataFrame
-        if not isinstance(x, pd.DataFrame):
-            error_msg: str = "Input x must be a pandas DataFrame for fitting."
-            raise TypeError(error_msg)
-
-        # Determine categorical features boolean mask
+        # If categorical features are not specified
         if self.cat_features is None:
+
             # Auto-detect categorical features (object dtype)
             self.cat_features_bool_ = x.dtypes == "object"
+
+        # If categorical features are specified by name
         else:
+
+            # If any specified categorical features are missing
+            if not pd.Index(self.cat_features).isin(x.columns).all():
+                # Get list of missing features
+                missing_features = [feat for feat in self.cat_features if feat not in x.columns]
+                # Set error message
+                error_msg: str = f"Categorical features not found in DataFrame: {missing_features}"
+                # Raise error
+                raise ValueError(error_msg)
+
+            # If any specified categorical features are not of object dtype
+            if pd.Index(self.cat_features).isin(x.select_dtypes(include=["object"]).columns).all():
+                # Get list of non-object dtype features
+                non_object_features = [feat for feat in self.cat_features if x[feat].dtype != "object"]
+                # Set error message
+                error_msg = f"Specified categorical features must be of object dtype: {non_object_features}"
+                # Raise error
+                raise TypeError(error_msg)
+
             # Create boolean mask based on provided categorical feature names
             self.cat_features_bool_ = x.columns.isin(self.cat_features)
 
@@ -96,7 +117,10 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             error_msg: str = f"Gower calculation failed: {e!s}"
             raise RuntimeError(error_msg) from e
 
-    def fit_transform(self, x: pd.DataFrame | np.ndarray, y: Any = None) -> NDArray[np.float32]:  # noqa: ARG002
+    def fit_transform(
+        self, x: pd.DataFrame | np.ndarray,
+        y: Any = None  # noqa: ARG002
+    ) -> NDArray[np.float32]:
         """Fit the transformer and transform the data in one step.
 
         Args:
@@ -104,7 +128,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             y: Ignored. Present for API consistency.
 
         Returns:
-            Square distance matrix of shape (n_samples, n_samples) with Gower distances.
+            NDArray[np.float32]: Gower distances matrix.
 
         """
         return self.fit(x).transform(x)
