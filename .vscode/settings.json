@@ -8,5 +8,7 @@
     "ruff.path": ["/Users/ak2002/Documents/automata/cluster/.venv/bin/ruff"],
     "ruff.interpreter": ["/Users/ak2002/Documents/automata/cluster/.venv/bin/python"],
     "ruff.format.preview": true,
-    "ruff.lint.preview": true
+    "ruff.lint.preview": true,
+    "python.linting.flake8Enabled": false,
+    "python.analysis.typeCheckingMode": "off"
 }
