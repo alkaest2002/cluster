@@ -24,14 +24,13 @@ plt.rcParams["font.family"] = "sans-serif"
 class KMedoidsAnalyzer:
     """Analyzer class for k-medoids clustering."""
 
-    def __init__(self, cat_features: list[str] | list[int] | list[bool] | None = None) -> None:
+    def __init__(self, cat_features: list[str] | None = None) -> None:
         """Initialize the KMedoidsAnalyzer.
 
         Args:
             cat_features: Specification of categorical features for Gower distance.
 
         """
-        self.cat_features: list[str] | list[int] | list[bool] | None = cat_features
         self.transformer: GowerDistanceTransformer = GowerDistanceTransformer(cat_features=cat_features)
         self.best_model_: KMedoidsWrapper | None = None
         self.best_k_: int | None = None
@@ -72,7 +71,7 @@ class KMedoidsAnalyzer:
         best_model: KMedoidsWrapper | None = None
         best_k: int = 0
 
-        # 2. Iterate
+        # 2. Iterate over k values
         for k in range(k_min, k_max + 1):
 
             # Instantiate and fit model
