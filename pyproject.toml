@@ -72,10 +72,12 @@ select = [
     "FLY",    # flynt
     "PERF",   # Perflint
     "RUF",    # Ruff-specific rules
+    "S",      # flake8-bandit
 ]
 
 # Never automatically remove unused imports in __init__.py
 ignore = [
+    "S101",  # Use of assert detected
     "D100",  # Missing docstring in public module
     "D104",  # Missing docstring in public package
     "D107",  # Missing docstring in __init__
