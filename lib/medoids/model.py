@@ -18,11 +18,28 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
 
     This wrapper provides a scikit-learn compatible interface for the kmedoids
     clustering algorithm, particularly for use with precomputed distance matrices.
+
+    Attributes:
+        n_clusters: Number of clusters.
+        method: Algorithm variant.
+        init: Initialization method.
+        max_iter: Maximum number of iterations.
+        random_state: Random state for reproducibility.
+        kmedoids_: Fitted KMedoids instance.
+        labels_: Cluster labels for each sample.
+        medoid_indices_: Indices of the medoids in the dataset.
+        inertia_: Sum of distances of samples to their closest medoid.
+        cluster_centers_: Not applicable for k-medoids, set to None.
+
+    Methods:
+        fit: Fit the k-medoids model to the data.
+        predict: Predict the closest cluster for new samples.
+
     """
 
     def __init__(
         self,
-        n_clusters: int = 3,
+        n_clusters: int = 2,
         method: str = "fasterpam",
         init: str = "build",
         max_iter: int = 100,
