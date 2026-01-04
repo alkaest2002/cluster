@@ -20,16 +20,10 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
     clustering algorithm, particularly for use with precomputed distance matrices.
 
     Attributes:
-        n_clusters: Number of clusters.
-        method: Algorithm variant.
-        init: Initialization method.
-        max_iter: Maximum number of iterations.
-        random_state: Random state for reproducibility.
-        kmedoids_: Fitted KMedoids instance.
+        kmedoids_: KMedoids instance.
         labels_: Cluster labels for each sample.
         medoid_indices_: Indices of the medoids in the dataset.
         inertia_: Sum of distances of samples to their closest medoid.
-        cluster_centers_: Not applicable for k-medoids, set to None.
 
     Methods:
         fit: Fit the k-medoids model to the data.
@@ -55,18 +49,17 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             random_state: Random state for reproducibility.
 
         """
-        self.n_clusters: int = n_clusters
-        self.method: str = method
-        self.init: str = init
-        self.max_iter: int = max_iter
-        self.random_state: int = random_state
-
-        # Attributes set during fitting
-        self.kmedoids_: KMedoids | None = None
-        self.labels_: NDArray[np.int_] | None = None
-        self.medoid_indices_: NDArray[np.int_] | None = None
+        self.kmedoids_: KMedoids = KMedoids(
+            n_clusters=n_clusters,
+            metric="precomputed",
+            method=method,
+            init=init,
+            max_iter=max_iter,
+            random_state=random_state
+        )
+        self.labels_: NDArray[np.int_] = np.array([], dtype=np.int_)
+        self.medoid_indices_: NDArray[np.int_] = np.array([], dtype=np.int_)
         self.inertia_: float | None = None
-        self.cluster_centers_: None = None
 
     def fit(self, x: NDArray[np.floating], y: Any = None) -> KMedoidsWrapper:  # noqa: ARG002
         """Fit the k-medoids clustering algorithm.
@@ -78,26 +71,8 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
         Returns:
             Self for method chaining.
 
-        Raises:
-            ValueError: If x is not a square matrix.
-
         """
-        # Must be square matrix
-        if x.shape[0] != x.shape[1]:
-            error_msg: str = f"Input must be a square distance matrix. Got shape {x.shape}."
-            raise ValueError(error_msg)
-
         try:
-            # Instantiate KMedoids model
-            self.kmedoids_ = KMedoids(
-                n_clusters=self.n_clusters,
-                metric="precomputed",
-                method=self.method,
-                init=self.init,
-                max_iter=self.max_iter,
-                random_state=self.random_state
-            )
-
             # Fit model
             self.kmedoids_.fit(x)
 
@@ -105,13 +80,11 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             self.labels_ = self.kmedoids_.labels_
             self.medoid_indices_ = self.kmedoids_.medoid_indices_
             self.inertia_ = self.kmedoids_.inertia_
-            self.cluster_centers_ = None  # Not applicable for k-medoids
 
-        except Exception as e:
+        except Exception:
             self.labels_ = np.zeros(x.shape[0], dtype=np.int_)
+            self.medoid_indices_ = np.array([], dtype=np.int_)
             self.inertia_ = np.inf
-            error_msg = f"KMedoids fitting failed for k={self.n_clusters}: {e!s}"
-            raise RuntimeError(error_msg) from e
 
         return self
 
