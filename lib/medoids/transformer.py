@@ -22,22 +22,18 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
     particularly useful for clustering heterogeneous data.
     """
 
-    def __init__(self, cat_features: list[str] | list[int] | list[bool] | None = None) -> None:
+    def __init__(self, cat_features: list[str] | None = None) -> None:
         """Initialize the GowerDistanceTransformer.
 
         Args:
-            cat_features: Specification of categorical features. Can be:
-                - List of column names (for DataFrames)
-                - List of column indices
-                - List of booleans indicating categorical columns
-                - None to auto-detect object columns in DataFrames
+            cat_features: Specification of categorical features by their column names.
+            cat_feateurs_bool_: Internal boolean mask for categorical features.
 
         """
-        self.cat_features: list[str] | list[int] | list[bool] | None = cat_features
-        self.cat_features_bool_: NDArray | None = None
-        self.n_features_: int | None = None
+        self.cat_features: list[str] | None = cat_features
+        self.cat_features_bool_: NDArray[np.bool_] | None = None
 
-    def fit(self, x: pd.DataFrame | NDArray, y: Any = None) -> GowerDistanceTransformer:  # noqa: ARG002
+    def fit(self, x: pd.DataFrame, y: Any = None) -> GowerDistanceTransformer:  # noqa: ARG002
         """Fit the transformer to the data.
 
         Determines which features are categorical based on the cat_features parameter
@@ -50,40 +46,26 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
         Returns:
             Self for method chaining.
 
+        Raises:
+            TypeError: If input x is not a pandas DataFrame.
+
         """
-        # If x is a DataFrame
-        if isinstance(x, pd.DataFrame):
-            # Determine boolean mask for categorical features
-            self.n_features_ = x.shape[1]
-            # If cat_features is provided
-            if self.cat_features is not None:
-                # If user passed a list of column names
-                if self.cat_features and isinstance(self.cat_features[0], str):
-                    cat_mask: pd.Series[bool] = x.columns.isin(self.cat_features)
-                    self.cat_features_bool_ = cat_mask.values
-                # If user passed indices
-                elif self.cat_features and isinstance(self.cat_features[0], int):
-                    bool_mask: NDArray = np.zeros(x.shape[1], dtype=bool)
-                    bool_mask[self.cat_features] = True
-                    self.cat_features_bool_ = bool_mask
-                # If user passed booleans
-                else:
-                    self.cat_features_bool_ = np.array(self.cat_features, dtype=bool)
-            # If cat_features is not provided
-            else:
-                # Auto-detect object columns if None provided
-                dtype_mask: pd.Series[bool] = x.dtypes == "object"
-                self.cat_features_bool_ = dtype_mask.values
-        # If x is a numpy array
+        # Raise error if x is not a DataFrame
+        if not isinstance(x, pd.DataFrame):
+            error_msg: str = "Input x must be a pandas DataFrame for fitting."
+            raise TypeError(error_msg)
+
+        # Determine categorical features boolean mask
+        if self.cat_features is None:
+            # Auto-detect categorical features (object dtype)
+            self.cat_features_bool_ = x.dtypes == "object"
         else:
-            # Fallback for numpy arrays (assumes cat_features is provided manually)
-            self.cat_features_bool_ = (
-                np.array(self.cat_features, dtype=bool) if self.cat_features is not None else None
-            )
+            # Create boolean mask based on provided categorical feature names
+            self.cat_features_bool_ = x.columns.isin(self.cat_features)
 
         return self
 
-    def transform(self, x: pd.DataFrame | NDArray) -> NDArray[np.float32]:
+    def transform(self, x: pd.DataFrame) -> NDArray[np.float32]:
         """Transform the input data into a Gower distance matrix.
 
         Args:
@@ -97,20 +79,17 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
 
         """
         try:
-            # Convert to DataFrame if needed
-            x_df: pd.DataFrame = pd.DataFrame(x) if not isinstance(x, pd.DataFrame) else x
-
             # Compute Gower distance matrix
-            dist_matrix: NDArray[np.floating] = gower.gower_matrix(x_df, cat_features=self.cat_features_bool_)
+            dist_matrix: NDArray[np.floating] = gower.gower_matrix(x, cat_features=self.cat_features_bool_)
 
             # Handle potential numerical instability
             # Set 1.0 for any NaN distances, i.e., max distance
-            clean_matrix: NDArray[np.floating] = np.nan_to_num(dist_matrix, nan=1.0)
+            dist_matrix_cleaned: NDArray[np.floating] = np.nan_to_num(dist_matrix, nan=1.0)
 
             # Ensure diagonal is zero
-            np.fill_diagonal(clean_matrix, 0.0)
+            np.fill_diagonal(dist_matrix_cleaned, 0.0)
 
-            return clean_matrix.astype(np.float32)
+            return dist_matrix_cleaned.astype(np.float32)
 
         # Catch any errors during Gower calculation
         except Exception as e:
