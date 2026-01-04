@@ -34,15 +34,17 @@ class KMedoidsAnalyzer:
             transformer: GowerDistanceTransformer instance.
             best_model_: Best k-medoids model found during optimization.
             best_n_clusters_: Best number of clusters found during optimization.
+            best_silhouette_: Best silhouette score achieved.
             dist_matrix_: Computed Gower distance matrix.
             results_df_: DataFrame containing optimization results.
 
         """
         self.transformer: GowerDistanceTransformer = GowerDistanceTransformer(cat_features=cat_features)
-        self.best_model_: KMedoidsWrapper | None = None
-        self.best_n_clusters_: int | None = None
-        self.dist_matrix_: NDArray[np.float32] | None = None
-        self.results_df_: pd.DataFrame | None = None
+        self.best_model_: dict[str, Any] = {}
+        self.best_n_clusters_: int = 0
+        self.best_silhouette_: float = -1.0
+        self.dist_matrix_: NDArray[np.float32] = np.array([], dtype=np.float32)
+        self.results_df_: pd.DataFrame = pd.DataFrame()
 
     @staticmethod
     def validate_dataframe_(df: pd.DataFrame) -> None:
@@ -78,34 +80,57 @@ class KMedoidsAnalyzer:
             random_state: Random state for reproducibility.
 
         Returns:
-            Dictionary with n_clusters, inertia, and silhouette score.
+            Dictionary with model, and silhouette score.
 
         """
         # Instantiate model
-        model: KMedoidsWrapper = KMedoidsWrapper(n_clusters=n_clusters, random_state=random_state)
+        model: KMedoidsWrapper = KMedoidsWrapper(
+            n_clusters=n_clusters,
+            random_state=random_state
+        )
+
         # Fit model
         model.fit(dist_matrix)
+
         # Store labels
-        labels: NDArray[np.int_] | None = model.labels_
+        labels: NDArray[np.int_] = model.labels_
+
         # Calculate Scores
-        if labels is not None and len(np.unique(labels)) > 1:
+        if len(np.unique(labels)) > 1:
             sil_score: float = silhouette_score(dist_matrix, labels, metric="precomputed")
         else:
             sil_score = -1.0
+
         # Return results
         return {
-            "n_clusters": n_clusters,
             "model": model,
-            "inertia": model.inertia_,
             "silhouette": sil_score
         }
+
+    def check_fitted_(self) -> None:
+        """Check if the analyzer has been fitted.
+
+        Raises:
+            ValueError: If the analyzer has not been fitted yet.
+                or no valid clustering is found.
+
+        """
+        # Check if best_model_ and dist_matrix_ are set
+        if len(self.best_model_) == 0 or self.dist_matrix_.size == 0:
+            error_msg: str = "Analyzer must be fitted before analysis."
+            raise ValueError(error_msg)
+
+        # Raise error if all silhouette scores are -1
+        if (self.results_df_["silhouette"] == -1.0).all():
+            error_msg = "No valid clustering found."
+            raise ValueError(error_msg)
 
     def run_optimization(
         self,
         df: pd.DataFrame,
         n_clusters_min: int = 2,
         n_clusters_max: int = 50
-    ) -> tuple[KMedoidsWrapper, int, NDArray[np.float32], pd.DataFrame]:
+    ) -> tuple[dict[str, Any], int, NDArray[np.float32], pd.DataFrame]:
         """Run k-medoids optimization across multiple k values.
 
         This function computes the Gower distance matrix once and then evaluates
@@ -119,74 +144,69 @@ class KMedoidsAnalyzer:
 
         Returns:
             Tuple containing:
-                - Best k-medoids model (highest silhouette score)
+                - Best k-medoids model dict (model + silhouette score)
                 - Best number of clusters
                 - Computed distance matrix
-                - DataFrame with evaluation metrics for all k values
+                - DataFrame with evaluation metrics for all n_clusters values
 
         """
+        # Initialize results list
+        results: list[dict[str, int | float | None]] = []
+
         # Validate DataFrame
         self.validate_dataframe_(df)
 
         # 1. Compute Gower distance matrix once
         self.dist_matrix_ = self.transformer.fit_transform(df)
 
-        # Initialize vars
-        results: list[dict[str, int | float | None]] = []
-
         # 2. Iterate over n_clusters values
         for n_clusters in range(n_clusters_min, n_clusters_max + 1):
 
             # Fit model
-            model: dict[str, Any] = self.fit_model_(n_clusters=n_clusters, dist_matrix=self.dist_matrix_)
+            model_dict: dict[str, Any] = self.fit_model_(n_clusters=n_clusters, dist_matrix=self.dist_matrix_)
 
             # Append to results list
-            results.append(model)
+            results.append({"n_clusters": n_clusters, **model_dict})
 
         # Convert results to DataFrame
         self.results_df_ = pd.DataFrame(results)
 
         # Find index of max silhouette score
         best_model_idx: int = self.results_df_["silhouette"].idxmax()
+
+        # Store best model and best_n_clusters
         self.best_model_ = self.results_df_.loc[best_model_idx, "model"]
         self.best_n_clusters_ = self.results_df_.loc[best_model_idx, "n_clusters"]
+        self.best_silhouette_ = self.results_df_.loc[best_model_idx, "silhouette"]
 
         return self.best_model_, self.best_n_clusters_, self.dist_matrix_, self.results_df_.drop(columns=["model"])
 
-    def plot_metrics(self, results_df: pd.DataFrame | None = None) -> str:
+    def plot_metrics(self) -> str:
         """Plot silhouette scores for different k values.
-
-        Args:
-            results_df: DataFrame containing 'k' and 'silhouette' columns.
-                       If None, uses the results from the last optimization run.
 
         Returns:
             SVG string of the plot.
 
+        Raises:
+            ValueError: If no results are available to plot.
+
         """
-        # Validate results_df
-        if results_df is None:
-            if self.results_df_ is None:
-                err_message: str = "No results available. Run optimization first."
-                raise ValueError(err_message)
-            results_df = self.results_df_
+        # Ensure analyzer is fitted
+        self.check_fitted_()
+
+        # Use provided results_df or the stored one
+        data: pd.DataFrame = self.results_df_
 
         # Create plot
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
-        # Determine best k based on max silhouette score
-        max_silhouette_value: float = results_df["silhouette"].max()
-
-        # Get best n_clusters corresponding to max silhouette score
-        best_n_clusters_series: pd.Series[int] = results_df.loc[results_df["silhouette"] == max_silhouette_value, "n_clusters"]
-
         # There could be multiple k with the same max silhouette, take the first one
-        best_n_clusters: int = best_n_clusters_series.values[0]
+        best_n_clusters: int = self.best_n_clusters_
 
         # Plot silhouette scores
-        ax.plot(results_df["n_clusters"], results_df["silhouette"], "ro-")
+        ax.plot(data["n_clusters"], data["silhouette"], "ro-")
         ax.set_title("Silhouette Analysis")
-        ax.set_xlabel("Number of Clusters (n_clusters)")
+        ax.set_xlabel("Number of Slusters")
         ax.set_ylabel("Silhouette Score (Higher is better)")
         ax.axvline(best_n_clusters, color="r")
         ax.grid(axis="y")
@@ -208,61 +228,41 @@ class KMedoidsAnalyzer:
     def analyze_model(
         self,
         df: pd.DataFrame,
-        model: KMedoidsWrapper | None = None,
-        dist_matrix: NDArray[np.float32] | None = None
     ) -> tuple[float, pd.DataFrame]:
-        """Analyze the fitted k-medoids model and return medoids and silhouette score.
+        """Analyze the fitted k-medoids model and return silhouette score and medoids.
 
         Args:
             df: Original DataFrame containing the clustered data.
-            model: Fitted k-medoids model. If None, uses the best model from optimization.
-            dist_matrix: Precomputed distance matrix used for clustering.
-                        If None, uses the matrix from optimization.
 
         Returns:
-            tuple[float, pd.DataFrame].
+            Tuple containing:
+                - Silhouette score of the best model.
+                - DataFrame of medoid rows with cluster labels and sizes.
 
         """
-        # Validate model
-        if model is None:
-            if self.best_model_ is None:
-                err_message: str = "No model available. Run optimization first."
-                raise ValueError(err_message)
-            model = self.best_model_
+        # Ensure analyzer is fitted
+        self.check_fitted_()
 
-        # Validate distance matrix
-        if dist_matrix is None:
-            if self.dist_matrix_ is None:
-                err_message = "No distance matrix available. Run optimization first."
-                raise ValueError(err_message)
-            dist_matrix = self.dist_matrix_
+        # Use stored best model
+        best_model = self.best_model_["model"]
 
         # Extract labels
-        labels: NDArray[np.int_] | None = model.labels_
+        labels: NDArray[np.int_] = best_model.labels_
 
         # Extract medoid indices
-        medoid_indices: NDArray[np.int_] | None = model.medoid_indices_
-
-        # If labels exist, compute silhouette score
-        if labels is not None:
-            score: float = silhouette_score(dist_matrix, labels, metric="precomputed")
+        medoid_indices: NDArray[np.int_] = best_model.medoid_indices_
 
         # Clone dataframe to avoid modifying original
         df_clone: pd.DataFrame = df.copy()
 
-        # If labels exist
-        if labels is not None:
-            # Assign cluster labels
-            df_clone["cluster"] = labels
-            # Calculate cluster sizes
-            df_clone = df_clone.assign(cluster_size=df_clone.groupby("cluster").transform("size"))
+        # Assign cluster labels and cluster sizes
+        df_clone = df_clone.assign(
+            cluster_label=labels,
+            cluster_size=lambda df: df.groupby("cluster_label").transform("size")
+        )
 
-        # Return medoids only
-        if medoid_indices is not None:
-            # Extract medoid rows
-            medoids_df: pd.DataFrame = df_clone.iloc[medoid_indices]
-            # Return silhouette score and medoids DataFrame
-            return score, medoids_df
+        # Extract medoid rows
+        medoids_df: pd.DataFrame = df_clone.iloc[medoid_indices]
 
-        # Fallback return full analysis if medoids not found
-        return score, df_clone
+        # Return silhouette score and medoids DataFrame
+        return self.best_silhouette_, medoids_df
