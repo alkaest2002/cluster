@@ -30,6 +30,13 @@ class KMedoidsAnalyzer:
         Args:
             cat_features: Specification of categorical features for Gower distance.
 
+        Attributes:
+            transformer: GowerDistanceTransformer instance.
+            best_model_: Best k-medoids model found during optimization.
+            best_k_: Best number of clusters found during optimization.
+            dist_matrix_: Computed Gower distance matrix.
+            results_df_: DataFrame containing optimization results.
+
         """
         self.transformer: GowerDistanceTransformer = GowerDistanceTransformer(cat_features=cat_features)
         self.best_model_: KMedoidsWrapper | None = None
@@ -62,6 +69,12 @@ class KMedoidsAnalyzer:
                 - DataFrame with evaluation metrics for all k values
 
         """
+        # Validate DataFrame dtypes
+        unsupported_dtypes: pd.DataFrame = df.select_dtypes(exclude=["number", "object", "bool"])
+        if not unsupported_dtypes.empty:
+            error_msg: str = f"Unsupported Dtypes in DataFrame: {unsupported_dtypes.dtypes.to_dict()}"
+            raise TypeError(error_msg)
+
         # 1. Compute Matrix
         self.dist_matrix_ = self.transformer.fit_transform(df)
 
