@@ -1,33 +1,28 @@
-import numpy as np
-import pandas as pd
-from numpy.typing import NDArray
+from pathlib import Path
 
 
-def greet(name: str) -> str:
-    """Just a simple greeting function.
+class PathUtils:
+    """Utility class for handling paths."""
 
-    Args:
-        name (str): The name of the person to greet.
+    DATAPATH = Path("./data")
+    OUTPATH = Path("./out")
 
-    Returns:
-        str: A greeting message.
+    @staticmethod
+    def get_data_path() -> Path:
+        """Get the data path.
 
-    """
-    return f"Hello, {name}!"
+        Returns:
+            Path: The path to the data directory.
 
+        """
+        return PathUtils.DATAPATH
 
-def get_columns_indices_from_regex(df: pd.DataFrame, regex: str) ->NDArray[np.int_]:
-    """Get the indices of columns in a DataFrame that match a given regex pattern.
-    
-    Args:
-        df (pd.DataFrame): The DataFrame to search.
-        regex (str): The regex pattern to match column names.
-    
-    Returns:
-        NDArray[np.int_]: An array of indices of matching columns.
-    """
-    # Create a boolean mask where column names match the regex
-    condition: pd.Series = df.columns.str.contains(regex, regex=True)
-    
-    # Return the indices of the columns that match the regex
-    return np.asarray(condition).nonzero()[0]
+    @staticmethod
+    def get_output_path() -> Path:
+        """Get the output path.
+
+        Returns:
+            Path: The path to the output directory.
+
+        """
+        return PathUtils.OUTPATH

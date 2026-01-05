@@ -1,23 +1,13 @@
-from __future__ import annotations
-
 import io
-import warnings
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
-from lib.medoids.model import KMedoidsWrapper
-from lib.medoids.transformer import GowerDistanceTransformer
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-warnings.filterwarnings("ignore")
-
-# set matplotlib font to sans-serif
-plt.rcParams["font.family"] = "sans-serif"
+from lib.k_medoids.model import KMedoidsWrapper
+from lib.k_medoids.transformer import GowerDistanceTransformer
 
 
 class KMedoidsAnalyzer:

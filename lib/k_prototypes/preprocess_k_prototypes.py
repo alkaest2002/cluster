@@ -1,21 +1,25 @@
+from typing import TYPE_CHECKING
+
 import pandas as pd
-from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline, Pipeline
-from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+if TYPE_CHECKING:
+    from sklearn.base import BaseEstimator
 
 
 def get_pipe(df: pd.DataFrame) -> Pipeline:
     """Create a preprocessing pipeline for numerical features.
-    
+
     Args:
         df (pd.DataFrame): Input DataFrame to determine column types.
 
     Returns:
         Pipeline: A scikit-learn Pipeline object for preprocessing.
-    """
 
+    """
     # Get indices of float columns
     float_cols: list[int] = [df.columns.get_loc(c) for c in df.select_dtypes(include=["float64"])]
 
@@ -37,8 +41,8 @@ def get_pipe(df: pd.DataFrame) -> Pipeline:
     preprocessor: ColumnTransformer = ColumnTransformer(
         [
             float_pipe_tuple
-        ], 
+        ],
         remainder="passthrough"
     )
-    
+
     return make_pipeline(preprocessor)

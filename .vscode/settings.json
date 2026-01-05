@@ -1,4 +1,5 @@
 {
+    "explorer.sortOrder": "foldersNestsFiles",
     "ruff.nativeServer": true,
     "ruff.enable": true,
     "ruff.organizeImports": true,

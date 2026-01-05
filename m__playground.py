@@ -9,8 +9,9 @@ def _():
     from pathlib import Path
     import numpy as np
     import pandas as pd
-    from lib.medoids.analyzer import KMedoidsAnalyzer
-    return KMedoidsAnalyzer, Path, np, pd
+    from lib.k_medoids.analyzer import KMedoidsAnalyzer
+    from lib.utils import PathUtils
+    return KMedoidsAnalyzer, Path, PathUtils, np, pd
 
 
 @app.cell
@@ -67,8 +68,8 @@ def _(best_model):
 
 
 @app.cell
-def _(Path, analyzer):
-    with Path("./plot.svg").open("w") as f_out:
+def _(Path, PathUtils, analyzer):
+    with Path(PathUtils.get_output_path() /"./plot.svg").open("w") as f_out:
         f_out.write(analyzer.get_plots()[0])
     return
 
