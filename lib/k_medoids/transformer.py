@@ -132,3 +132,25 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
 
         """
         return self.fit(x).transform(x)
+
+    def get_feature_names_out(self) -> None:
+        """Get output feature names for transformation.
+
+        Since this transformer outputs a distance matrix where each element
+        represents the distance between sample pairs, traditional feature names
+        are not applicable.
+
+        Returns:
+            None: This method always raises NotImplementedError.
+
+        Raises:
+            NotImplementedError: Distance matrices don't have meaningful
+                feature names in the traditional sense.
+
+        """
+        error_msg = (
+            "GowerDistanceTransformer outputs a distance matrix (n_samples X n_samples) "
+            "which doesn't have meaningful feature names. Use the distance matrix directly "
+            "for clustering or similarity analysis."
+        )
+        raise NotImplementedError(error_msg)
