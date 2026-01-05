@@ -61,8 +61,8 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             random_state=random_state
         )
         self.n_clusters: int = n_clusters
-        self.labels_: NDArray[np.int_] = np.array([], dtype=np.int_)
-        self.medoid_indices_: NDArray[np.int_] = np.array([], dtype=np.int_)
+        self.labels_: NDArray[np.int32] = np.array([], dtype=np.int32)
+        self.medoid_indices_: NDArray[np.int32] = np.array([], dtype=np.int32)
         self.inertia_: float | None = None
         self.silhouette_score_: float | None = None
 
@@ -93,8 +93,8 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
                 self.silhouette_score_ = -1.0
 
         except Exception:
-            self.labels_ = np.zeros(x.shape[0], dtype=np.int_)
-            self.medoid_indices_ = np.array([], dtype=np.int_)
+            self.labels_ = np.zeros(x.shape[0], dtype=np.int32)
+            self.medoid_indices_ = np.array([], dtype=np.int32)
             self.inertia_ = np.inf
             self.silhouette_score_ = -1.0
 
@@ -113,7 +113,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             AttributeError: If the model has not been fitted yet.
 
         """
-        if self.kmedoids_ is None:
+        if not hasattr(self, "labels_") or len(self.labels_) == 0:
             error_msg: str = "Model must be fitted before making predictions."
             raise AttributeError(error_msg)
 
