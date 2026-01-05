@@ -165,12 +165,12 @@ class Optimizer:
         # Find index of max silhouette score
         best_model_idx: int = self.results_df_["silhouette"].idxmax()
 
-        # Store best model and best_n_clusters
+        # Store best model related attributes
         self.best_model_ = self.results_df_.loc[best_model_idx, "model"]
         self.best_silhouette_ = self.results_df_.loc[best_model_idx, "silhouette"]
         self.best_model_labels_ = self.best_model_.labels_
 
-        # Assign cluster labels and cluster sizes from best model
+        # Assign cluster labels and cluster sizes from best model to original DataFrame
         self.df = self.df.assign(
             cluster=self.best_model_.labels_,
             cluster_size=lambda df: df.groupby("cluster").transform("size")
