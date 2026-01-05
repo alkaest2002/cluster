@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.metrics import silhouette_score
 
 from lib.medoids.model import KMedoidsWrapper
 from lib.medoids.transformer import GowerDistanceTransformer
@@ -92,19 +91,12 @@ class KMedoidsAnalyzer:
         # Fit model
         model.fit(dist_matrix)
 
-        # Store labels
-        labels: NDArray[np.int_] = model.labels_
-
-        # Calculate Scores
-        if len(np.unique(labels)) > 1:
-            sil_score: float = silhouette_score(dist_matrix, labels, metric="precomputed")
-        else:
-            sil_score = -1.0
-
         # Return results
         return {
             "model": model,
-            "silhouette": sil_score
+            "n_clusters": n_clusters,
+            "inertia": model.inertia_,
+            "silhouette": model.silhouette_score_
         }
 
     def check_fitted_(self) -> None:
@@ -169,7 +161,7 @@ class KMedoidsAnalyzer:
             model_dict: dict[str, Any] = self.fit_model_(n_clusters=n_clusters, dist_matrix=self.dist_matrix_)
 
             # Append to results list
-            results.append({"n_clusters": n_clusters, **model_dict})
+            results.append(model_dict)
 
         # Convert results to DataFrame
         self.results_df_ = pd.DataFrame(results)
@@ -184,8 +176,8 @@ class KMedoidsAnalyzer:
 
         # Assign cluster labels and cluster sizes from best model
         self.df = self.df.assign(
-            cluster_label=self.best_model_.labels_,
-            cluster_size=lambda df: df.groupby("cluster_label").transform("size")
+            cluster=self.best_model_.labels_,
+            cluster_size=lambda df: df.groupby("cluster").transform("size")
         )
 
         return self.best_model_, self.dist_matrix_, self.results_df_.drop(columns=["model"])
