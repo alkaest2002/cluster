@@ -118,7 +118,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             raise RuntimeError(error_msg) from e
 
     def fit_transform(
-        self, x: pd.DataFrame | np.ndarray,
+        self, x: pd.DataFrame,
         y: Any = None  # noqa: ARG002
     ) -> NDArray[np.float32]:
         """Fit the transformer and transform the data in one step.
