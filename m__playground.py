@@ -6,12 +6,16 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
+    import importlib
+    import lib.k_medoids
+    importlib.reload(lib.k_medoids)
+
     from pathlib import Path
+    from lib.k_medoids.optimizer import Optimizer
     import numpy as np
     import pandas as pd
-    from lib.k_medoids.analyzer import KMedoidsAnalyzer
     from lib.utils import PathUtils
-    return KMedoidsAnalyzer, Path, PathUtils, np, pd
+    return Optimizer, Path, PathUtils, np, pd
 
 
 @app.cell
@@ -50,14 +54,14 @@ def _(create_sample_data):
 
 
 @app.cell
-def _(KMedoidsAnalyzer, cat_features):
-    analyzer = KMedoidsAnalyzer(cat_features=cat_features)
-    return (analyzer,)
+def _(Optimizer, cat_features):
+    optimizer = Optimizer(cat_features=cat_features)
+    return (optimizer,)
 
 
 @app.cell
-def _(analyzer, df):
-    best_model,dist_matrix, results_df = analyzer.run_optimization(df=df,n_clusters_min=2,n_clusters_max=30)
+def _(df, optimizer):
+    best_model,dist_matrix, results_df = optimizer.optimize(df=df,n_clusters_min=2,n_clusters_max=30)
     return (best_model,)
 
 
@@ -68,15 +72,15 @@ def _(best_model):
 
 
 @app.cell
-def _(Path, PathUtils, analyzer):
+def _(Path, PathUtils, optimizer):
     with Path(PathUtils.get_output_path() /"./plot.svg").open("w") as f_out:
-        f_out.write(analyzer.get_plots()[0])
+        f_out.write(optimizer.get_plots()[0])
     return
 
 
 @app.cell
-def _(analyzer):
-    analyzer.get_medoids()
+def _(optimizer):
+    optimizer.get_analysis()
     return
 
 
