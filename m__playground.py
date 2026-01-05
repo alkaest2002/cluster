@@ -57,12 +57,12 @@ def _(KMedoidsAnalyzer, cat_features):
 @app.cell
 def _(analyzer, df):
     best_model,dist_matrix, results_df = analyzer.run_optimization(df=df,n_clusters_min=2,n_clusters_max=30)
-    return (dist_matrix,)
+    return (best_model,)
 
 
 @app.cell
-def _(dist_matrix):
-    dist_matrix
+def _(best_model):
+    best_model.n_clusters
     return
 
 
