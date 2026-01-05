@@ -66,6 +66,27 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
         self.inertia_: float | None = None
         self.silhouette_score_: float | None = None
 
+    @staticmethod
+    def validate_distance_matrix_(dist_matrix: NDArray[np.float32]) -> None:
+        """Validate the distance matrix is square and non-empty.
+
+        Args:
+            dist_matrix: Distance matrix to validate.
+
+        Raises:
+            ValueError: If the distance matrix is not square or is empty.
+
+        """
+        # Check if distance matrix is empty
+        if dist_matrix.size == 0:
+            error_msg: str = "Distance matrix is empty."
+            raise ValueError(error_msg)
+
+        # Check if distance matrix is square
+        if dist_matrix.shape[0] != dist_matrix.shape[1]:
+            error_msg = "Distance matrix must be square."
+            raise ValueError(error_msg)
+
     def fit(self, x: NDArray[np.floating], y: Any = None) -> KMedoidsWrapper:  # noqa: ARG002
         """Fit the k-medoids clustering algorithm.
 

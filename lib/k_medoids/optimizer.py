@@ -57,27 +57,6 @@ class Optimizer:
             raise TypeError(error_msg)
 
     @staticmethod
-    def validate_distance_matrix_(dist_matrix: NDArray[np.float32]) -> None:
-        """Validate the distance matrix is square and non-empty.
-
-        Args:
-            dist_matrix: Distance matrix to validate.
-
-        Raises:
-            ValueError: If the distance matrix is not square or is empty.
-
-        """
-        # Check if distance matrix is empty
-        if dist_matrix.size == 0:
-            error_msg: str = "Distance matrix is empty."
-            raise ValueError(error_msg)
-
-        # Check if distance matrix is square
-        if dist_matrix.shape[0] != dist_matrix.shape[1]:
-            error_msg = "Distance matrix must be square."
-            raise ValueError(error_msg)
-
-    @staticmethod
     def fit_model_(
         n_clusters: int,
         dist_matrix: NDArray[np.float32],
@@ -168,8 +147,6 @@ class Optimizer:
         # 1. Compute Gower distance matrix once
         #######################################################################################################
         self.dist_matrix_ = self.transformer.fit_transform(df)
-
-        self.validate_distance_matrix_(self.dist_matrix_)
 
         #######################################################################################################
         # 2. Iterate over n_clusters values
