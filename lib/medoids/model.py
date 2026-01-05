@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from kmedoids import KMedoids
 from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.metrics import silhouette_score
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -25,6 +26,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
         labels_: Cluster labels for each sample.
         medoid_indices_: Indices of the medoids in the dataset.
         inertia_: Sum of distances of samples to their closest medoid.
+        silhouette_score_: Silhouette score of the clustering.
 
     Methods:
         fit: Fit the k-medoids model to the data.
@@ -62,6 +64,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
         self.labels_: NDArray[np.int_] = np.array([], dtype=np.int_)
         self.medoid_indices_: NDArray[np.int_] = np.array([], dtype=np.int_)
         self.inertia_: float | None = None
+        self.silhouette_score_: float | None = None
 
     def fit(self, x: NDArray[np.floating], y: Any = None) -> KMedoidsWrapper:  # noqa: ARG002
         """Fit the k-medoids clustering algorithm.
@@ -83,10 +86,17 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             self.medoid_indices_ = self.kmedoids_.medoid_indices_
             self.inertia_ = self.kmedoids_.inertia_
 
+            # Calculate Scores
+            if len(np.unique(self.labels_)) > 1:
+                self.silhouette_score_ = silhouette_score(x, self.labels_, metric="precomputed")
+            else:
+                self.silhouette_score_ = -1.0
+
         except Exception:
             self.labels_ = np.zeros(x.shape[0], dtype=np.int_)
             self.medoid_indices_ = np.array([], dtype=np.int_)
             self.inertia_ = np.inf
+            self.silhouette_score_ = -1.0
 
         return self
 
