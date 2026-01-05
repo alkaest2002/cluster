@@ -57,6 +57,27 @@ class Optimizer:
             raise TypeError(error_msg)
 
     @staticmethod
+    def validate_distance_matrix_(dist_matrix: NDArray[np.float32]) -> None:
+        """Validate the distance matrix is square and non-empty.
+
+        Args:
+            dist_matrix: Distance matrix to validate.
+
+        Raises:
+            ValueError: If the distance matrix is not square or is empty.
+
+        """
+        # Check if distance matrix is empty
+        if dist_matrix.size == 0:
+            error_msg: str = "Distance matrix is empty."
+            raise ValueError(error_msg)
+
+        # Check if distance matrix is square
+        if dist_matrix.shape[0] != dist_matrix.shape[1]:
+            error_msg = "Distance matrix must be square."
+            raise ValueError(error_msg)
+
+    @staticmethod
     def fit_model_(
         n_clusters: int,
         dist_matrix: NDArray[np.float32],
@@ -148,6 +169,8 @@ class Optimizer:
         #######################################################################################################
         self.dist_matrix_ = self.transformer.fit_transform(df)
 
+        self.validate_distance_matrix_(self.dist_matrix_)
+
         #######################################################################################################
         # 2. Iterate over n_clusters values
         ########################################################################################################
@@ -207,7 +230,7 @@ class Optimizer:
         # Plot silhouette scores
         ax.plot(data["n_clusters"], data["silhouette"], "ro-")
         ax.set_title("Silhouette Analysis")
-        ax.set_xlabel("Number of Slusters")
+        ax.set_xlabel("Number of Clusters")
         ax.set_ylabel("Silhouette Score (Higher is better)")
         ax.axvline(best_n_clusters, color="r")
         ax.grid(axis="y")
@@ -224,7 +247,12 @@ class Optimizer:
         # Close figure
         plt.close(fig)
 
-        return [buffer.getvalue().decode()]
+        # Retrieve SVG string from buffer
+        buffer.seek(0)
+        svg_content: str = buffer.getvalue().decode()
+        buffer.close()
+
+        return [svg_content]
 
     def get_analysis(self) -> pd.DataFrame:
         """Analyze the fitted k-medoids model and return silhouette score and medoids.
@@ -241,7 +269,7 @@ class Optimizer:
         assert isinstance(self.best_model_, KMedoidsWrapper)  # nosec
 
         # Extract medoid indices
-        medoid_indices: NDArray[np.int_] = self.best_model_.medoid_indices_
+        medoid_indices: NDArray[np.int32] = self.best_model_.medoid_indices_
 
         # get medoid rows
         medoids_df: pd.DataFrame = self.df.iloc[medoid_indices].copy()
