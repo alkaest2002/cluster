@@ -10,8 +10,8 @@ from lib.k_medoids.model import KMedoidsWrapper
 from lib.k_medoids.transformer import GowerDistanceTransformer
 
 
-class KMedoidsAnalyzer:
-    """Analyzer class for k-medoids clustering."""
+class Optimizer:
+    """Optimizer class for k-medoids clustering."""
 
     def __init__(self, cat_features: list[str] | None = None) -> None:
         """Initialize the KMedoidsAnalyzer.
@@ -46,9 +46,10 @@ class KMedoidsAnalyzer:
             TypeError: If unsupported dtypes are found in the DataFrame.
 
         """
-        # Identify unsupported dtypes
+        # Identify unsupported dtypes in DataFrame
         unsupported_dtypes: pd.DataFrame = df.select_dtypes(exclude=["number", "object", "bool"])
-        # If any unsupported dtypes are found
+
+        # If any unsupported dtypes are found in DataFrame
         if not unsupported_dtypes.empty:
             # Set error message
             error_msg: str = f"Unsupported Dtypes in DataFrame: {unsupported_dtypes.dtypes.to_dict()}"
@@ -103,11 +104,12 @@ class KMedoidsAnalyzer:
             raise ValueError(error_msg)
 
         # Raise error if all silhouette scores are -1
+        # This indicates no valid clustering was found
         if (self.results_df_["silhouette"] == -1.0).all():
             error_msg = "No valid clustering found."
             raise ValueError(error_msg)
 
-    def run_optimization(
+    def optimize(
         self,
         df: pd.DataFrame,
         n_clusters_min: int = 2,
@@ -138,13 +140,17 @@ class KMedoidsAnalyzer:
         # Validate DataFrame
         self.validate_dataframe_(df)
 
-        # Store DataFrame
+        # Copy DataFrame
         self.df = df.copy()
 
+        #######################################################################################################
         # 1. Compute Gower distance matrix once
+        #######################################################################################################
         self.dist_matrix_ = self.transformer.fit_transform(df)
 
+        #######################################################################################################
         # 2. Iterate over n_clusters values
+        ########################################################################################################
         for n_clusters in range(n_clusters_min, n_clusters_max + 1):
 
             # Fit model
@@ -183,16 +189,17 @@ class KMedoidsAnalyzer:
 
         """
         # Ensure analyzer is fitted
+        # If error is not raise, subsequent code can safely assume best_model_ is set
         self.check_fitted_()
-
-        # Use provided results_df or the stored one
-        data: pd.DataFrame = self.results_df_
-
-        # Create plot
-        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
         # Ensure best_model_ is KMedoidsWrapper for type checker
         assert isinstance(self.best_model_, KMedoidsWrapper)  # nosec
+
+        # Get results DataFrame
+        data: pd.DataFrame = self.results_df_
+
+        # Create plot figure and axis
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
         # Get best number of clusters
         best_n_clusters: int = self.best_model_.n_clusters
@@ -219,7 +226,7 @@ class KMedoidsAnalyzer:
 
         return [buffer.getvalue().decode()]
 
-    def get_medoids(self) -> pd.DataFrame:
+    def get_analysis(self) -> pd.DataFrame:
         """Analyze the fitted k-medoids model and return silhouette score and medoids.
 
         Returns:
@@ -227,6 +234,7 @@ class KMedoidsAnalyzer:
 
         """
         # Ensure analyzer is fitted
+        # If error is not raise, subsequent code can safely assume best_model_ is set
         self.check_fitted_()
 
         # Assert best_model is KMedoidsWrapper for type checker
