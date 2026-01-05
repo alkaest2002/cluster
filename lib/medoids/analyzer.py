@@ -31,20 +31,20 @@ class KMedoidsAnalyzer:
             cat_features: Specification of categorical features for Gower distance.
 
         Attributes:
-            transformer: GowerDistanceTransformer instance.
-            best_model_: Best k-medoids model found during optimization.
-            best_n_clusters_: Best number of clusters found during optimization.
-            best_silhouette_: Best silhouette score achieved.
-            dist_matrix_: Computed Gower distance matrix.
+            df: Input DataFrame.
             results_df_: DataFrame containing optimization results.
+            transformer: GowerDistanceTransformer instance.
+            dist_matrix_: Computed Gower distance matrix.
+            best_model_: Best k-medoids model found during optimization.
+            best_silhouette_: Best silhouette score achieved.
 
         """
-        self.transformer: GowerDistanceTransformer = GowerDistanceTransformer(cat_features=cat_features)
-        self.best_model_: dict[str, Any] = {}
-        self.best_n_clusters_: int = 0
-        self.best_silhouette_: float = -1.0
-        self.dist_matrix_: NDArray[np.float32] = np.array([], dtype=np.float32)
+        self.df: pd.DataFrame = pd.DataFrame()
         self.results_df_: pd.DataFrame = pd.DataFrame()
+        self.transformer: GowerDistanceTransformer = GowerDistanceTransformer(cat_features=cat_features)
+        self.dist_matrix_: NDArray[np.float32] = np.array([], dtype=np.float32)
+        self.best_model_: KMedoidsWrapper | None = None
+        self.best_silhouette_: float = -1.0
 
     @staticmethod
     def validate_dataframe_(df: pd.DataFrame) -> None:
@@ -116,7 +116,7 @@ class KMedoidsAnalyzer:
 
         """
         # Check if best_model_ and dist_matrix_ are set
-        if len(self.best_model_) == 0 or self.dist_matrix_.size == 0:
+        if self.best_model_ is None or self.dist_matrix_.size == 0:
             error_msg: str = "Analyzer must be fitted before analysis."
             raise ValueError(error_msg)
 
@@ -130,7 +130,7 @@ class KMedoidsAnalyzer:
         df: pd.DataFrame,
         n_clusters_min: int = 2,
         n_clusters_max: int = 50
-    ) -> tuple[dict[str, Any], int, NDArray[np.float32], pd.DataFrame]:
+    ) -> tuple[dict[str, Any], NDArray[np.float32], pd.DataFrame]:
         """Run k-medoids optimization across multiple k values.
 
         This function computes the Gower distance matrix once and then evaluates
@@ -156,6 +156,9 @@ class KMedoidsAnalyzer:
         # Validate DataFrame
         self.validate_dataframe_(df)
 
+        # Store DataFrame
+        self.df = df.copy()
+
         # 1. Compute Gower distance matrix once
         self.dist_matrix_ = self.transformer.fit_transform(df)
 
@@ -176,16 +179,22 @@ class KMedoidsAnalyzer:
 
         # Store best model and best_n_clusters
         self.best_model_ = self.results_df_.loc[best_model_idx, "model"]
-        self.best_n_clusters_ = self.results_df_.loc[best_model_idx, "n_clusters"]
         self.best_silhouette_ = self.results_df_.loc[best_model_idx, "silhouette"]
+        self.best_model_labels_ = self.best_model_.labels_
 
-        return self.best_model_, self.best_n_clusters_, self.dist_matrix_, self.results_df_.drop(columns=["model"])
+        # Assign cluster labels and cluster sizes from best model
+        self.df = self.df.assign(
+            cluster_label=self.best_model_.labels_,
+            cluster_size=lambda df: df.groupby("cluster_label").transform("size")
+        )
 
-    def plot_metrics(self) -> str:
+        return self.best_model_, self.dist_matrix_, self.results_df_.drop(columns=["model"])
+
+    def get_plots(self) -> list[str]:
         """Plot silhouette scores for different k values.
 
         Returns:
-            SVG string of the plot.
+            list[str]: List containing SVG strings of the plots.
 
         Raises:
             ValueError: If no results are available to plot.
@@ -200,8 +209,11 @@ class KMedoidsAnalyzer:
         # Create plot
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
-        # There could be multiple k with the same max silhouette, take the first one
-        best_n_clusters: int = self.best_n_clusters_
+        # Ensure best_model_ is KMedoidsWrapper for type checker
+        assert isinstance(self.best_model_, KMedoidsWrapper)  # nosec
+
+        # Get best number of clusters
+        best_n_clusters: int = self.best_model_.n_clusters
 
         # Plot silhouette scores
         ax.plot(data["n_clusters"], data["silhouette"], "ro-")
@@ -223,46 +235,25 @@ class KMedoidsAnalyzer:
         # Close figure
         plt.close(fig)
 
-        return buffer.getvalue().decode()
+        return [buffer.getvalue().decode()]
 
-    def analyze_model(
-        self,
-        df: pd.DataFrame,
-    ) -> tuple[float, pd.DataFrame]:
+    def get_medoids(self) -> pd.DataFrame:
         """Analyze the fitted k-medoids model and return silhouette score and medoids.
 
-        Args:
-            df: Original DataFrame containing the clustered data.
-
         Returns:
-            Tuple containing:
-                - Silhouette score of the best model.
-                - DataFrame of medoid rows with cluster labels and sizes.
+            pd.DataFrame: DataFrame of medoid rows with cluster labels and sizes.
 
         """
         # Ensure analyzer is fitted
         self.check_fitted_()
 
-        # Use stored best model
-        best_model = self.best_model_["model"]
-
-        # Extract labels
-        labels: NDArray[np.int_] = best_model.labels_
+        # Assert best_model is KMedoidsWrapper for type checker
+        assert isinstance(self.best_model_, KMedoidsWrapper)  # nosec
 
         # Extract medoid indices
-        medoid_indices: NDArray[np.int_] = best_model.medoid_indices_
+        medoid_indices: NDArray[np.int_] = self.best_model_.medoid_indices_
 
-        # Clone dataframe to avoid modifying original
-        df_clone: pd.DataFrame = df.copy()
+        # get medoid rows
+        medoids_df: pd.DataFrame = self.df.iloc[medoid_indices].copy()
 
-        # Assign cluster labels and cluster sizes
-        df_clone = df_clone.assign(
-            cluster_label=labels,
-            cluster_size=lambda df: df.groupby("cluster_label").transform("size")
-        )
-
-        # Extract medoid rows
-        medoids_df: pd.DataFrame = df_clone.iloc[medoid_indices]
-
-        # Return silhouette score and medoids DataFrame
-        return self.best_silhouette_, medoids_df
+        return medoids_df
