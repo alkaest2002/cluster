@@ -21,6 +21,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
 
     Attributes:
         kmedoids_: KMedoids instance.
+        n_clusters: Number of clusters.
         labels_: Cluster labels for each sample.
         medoid_indices_: Indices of the medoids in the dataset.
         inertia_: Sum of distances of samples to their closest medoid.
@@ -57,6 +58,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             max_iter=max_iter,
             random_state=random_state
         )
+        self.n_clusters: int = n_clusters
         self.labels_: NDArray[np.int_] = np.array([], dtype=np.int_)
         self.medoid_indices_: NDArray[np.int_] = np.array([], dtype=np.int_)
         self.inertia_: float | None = None
