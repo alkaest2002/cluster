@@ -56,7 +56,7 @@ def _(KMedoidsAnalyzer, cat_features):
 
 @app.cell
 def _(analyzer, df):
-    best_model, best_k, dist_matrix, results_df = analyzer.run_optimization(df=df,n_clusters_min=2,n_clusters_max=30)
+    best_model,dist_matrix, results_df = analyzer.run_optimization(df=df,n_clusters_min=2,n_clusters_max=30)
     return (dist_matrix,)
 
 
@@ -69,12 +69,13 @@ def _(dist_matrix):
 @app.cell
 def _(Path, analyzer):
     with Path("./plot.svg").open("w") as f_out:
-        f_out.write(analyzer.plot_metrics())
+        f_out.write(analyzer.get_plots()[0])
     return
 
 
 @app.cell
-def _():
+def _(analyzer):
+    analyzer.get_medoids()
     return
 
 
