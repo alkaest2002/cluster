@@ -96,7 +96,7 @@ exclude = [
     "__pycache__",
     "build",
     "dist",
-    "warehouse",
+    "acme",
     ".eggs",
     "m__*.py"
 ]
@@ -135,7 +135,7 @@ exclude = [
     ".venv",
     "build",
     "dist",
-    "warehouse",
+    "acme",
     "(^|.*/)m__.*\\.py$"
 ]
 
