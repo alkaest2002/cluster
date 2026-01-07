@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -30,19 +31,45 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
 
         Attributes:
             variance_threshold: The variance threshold for feature selection.
-            pipeline_: The fitted preprocessing pipeline.
+            transformer_: The fitted preprocessing transformer.
             float_columns_: List of column names that are float64 dtype.
 
         """
         self.variance_threshold: float = variance_threshold
-        self.pipeline_: Pipeline | None = None
+        self.transformer_: ColumnTransformer | None = None
         self.float_columns_: list[str] | None = None
+
+    @staticmethod
+    def check_is_fitted_(instance: Any, attributes: list[str]) -> None:
+        """Check if the estimator instance is fitted by verifying the presence of attributes.
+
+        Args:
+            instance: The estimator instance to check.
+            attributes: List of attribute names that should be present if fitted.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If any of the specified attributes are not found in the instance.
+
+        """
+        # Identify missing attributes
+        missing_attrs = [attr for attr in attributes if not hasattr(instance, attr)]
+
+        # If any attributes are missing, raise ValueError
+        if missing_attrs:
+            error_msg = (
+                f"This {instance.__class__.__name__} instance is not fitted yet. "
+                f"Missing attributes: {missing_attrs}"
+            )
+            raise ValueError(error_msg)
 
     def fit(self, x: pd.DataFrame, y: Any = None) -> NumericPreprocessor:  # noqa: ARG002
         """Fit the transformer to the data.
 
-        Identifies float64 columns and creates a preprocessing pipeline
-        with variance thresholding and standard scaling.
+        Identifies float columns, creates a preprocessing pipeline
+        and fits it to learn the transformation parameters.
 
         Args:
             x: Input data to fit the transformer on.
@@ -52,49 +79,46 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
             Self for method chaining.
 
         Raises:
-            ValueError: If no float64 columns are found in the DataFrame.
+            ValueError: If no float columns are found in the DataFrame.
+            RuntimeError: If fitting the preprocessing pipeline fails.
 
         """
         # Identify float columns
-        self.float_columns_ = x.select_dtypes(include=["float"]).columns.tolist()
+        self.float_columns_ = x.select_dtypes(include=["float64"]).columns.tolist()
 
         # Check if any float columns exist
         if not self.float_columns_:
-            error_msg: str = "No float columns found in DataFrame for preprocessing"
+            error_msg: str = "No float64 columns found in DataFrame for preprocessing"
             raise ValueError(error_msg)
-
-        # Get column indices for ColumnTransformer
-        float_col_indices: list[int] = [x.columns.get_loc(col) for col in self.float_columns_]
 
         # Define preprocessing steps for float columns
         float_steps: list[tuple[str, BaseEstimator]] = [
             ("variance_threshold", VarianceThreshold(threshold=self.variance_threshold)),
+            ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
         ]
 
         # Create pipeline for float columns
         float_pipeline: Pipeline = Pipeline(steps=float_steps)
 
-        # Create column transformer
-        preprocessor: ColumnTransformer = ColumnTransformer(
+        # Create column transformer using column names (more robust than indices)
+        self.transformer_ = ColumnTransformer(
             transformers=[
-                ("float", float_pipeline, float_col_indices)
+                ("float", float_pipeline, self.float_columns_)
             ],
-            remainder="passthrough",
-            verbose_feature_names_out=False
+            remainder="passthrough",  # Keep non-float columns unchanged
+            verbose_feature_names_out=False  # Avoid adding transformer names to output feature names
         )
 
-        # Create and fit the main pipeline
-        self.pipeline_ = Pipeline([("preprocessor", preprocessor)])
-
         try:
-            # Fit the pipeline
-            self.pipeline_.fit(x)
+            # Fit the transformer to learn parameters
+            self.transformer_.fit(x)
 
         # Catch any exceptions during fitting
         except Exception as e:
             error_msg = f"Failed to fit preprocessing pipeline: {e!s}"
             raise RuntimeError(error_msg) from e
+
         else:
             return self
 
@@ -113,16 +137,20 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
 
         """
         # Check if transformer is fitted
-        if self.pipeline_ is None:
-            error_msg: str = "This Numeric Preprocessor instance is not fitted yet"
-            raise ValueError(error_msg)
+        self.check_is_fitted_(self, ["transformer_"])
+
+        # Assert transformer_ is not None for type checkers
+        assert self.transformer_ is not None  # nosec
 
         try:
-            # Transform the data
-            transformed_data: NDArray[Any] = self.pipeline_.transform(x)
+            # Apply the learned transformation
+            transformed_data: NDArray[Any] = self.transformer_.transform(x)
+
+        # Catch any exceptions during transformation
         except Exception as e:
             error_msg = f"Failed to transform data: {e!s}"
             raise RuntimeError(error_msg) from e
+
         else:
             return transformed_data
 
@@ -150,16 +178,22 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
 
         Raises:
             ValueError: If the transformer has not been fitted yet.
+            RuntimeError: If getting feature names fails.
 
         """
-        if self.pipeline_ is None:
-            error_msg: str = "This NumericPreprocessor instance is not fitted yet"
-            raise ValueError(error_msg)
+        # Check if transformer is fitted
+        self.check_is_fitted_(self, ["transformer_"])
+
+        # Assert transformer_ is not None for type checkers
+        assert self.transformer_ is not None  # nosec
 
         try:
-            feature_names: list[str] = list(self.pipeline_.get_feature_names_out(input_features))
+            feature_names: list[str] = list(self.transformer_.get_feature_names_out(input_features))
+
+        # Catch any exceptions during getting feature names
         except Exception as e:
             error_msg = f"Failed to get feature names: {e!s}"
             raise RuntimeError(error_msg) from e
+
         else:
             return feature_names
