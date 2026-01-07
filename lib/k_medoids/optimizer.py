@@ -47,7 +47,7 @@ class Optimizer:
 
         """
         # Identify unsupported dtypes in DataFrame
-        unsupported_dtypes: pd.DataFrame = df.select_dtypes(exclude=["number", "object", "bool"])
+        unsupported_dtypes: pd.DataFrame = df.select_dtypes(exclude=["number", "object"])
 
         # If any unsupported dtypes are found in DataFrame
         if not unsupported_dtypes.empty:
