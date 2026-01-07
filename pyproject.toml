@@ -149,6 +149,7 @@ module = [
     "matplotlib.*",
     "seaborn.*",
     "kmedoids.*",
+    "kmodes.*", 
     "gower.*",
     "umap.*",
 ]
