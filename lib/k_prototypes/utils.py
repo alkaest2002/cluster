@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -10,7 +9,7 @@ def k_prototypes_distance(
     x_num: npt.ArrayLike,
     x_cat: npt.ArrayLike,
     gamma: float = 1.0,
-    num_scale: bool = True,
+    standardize_num_scales: bool = True,
     dtype: npt.DTypeLike = np.float32,
 ) -> np.ndarray:
     """Calculate pairwise k-prototypes distances for mixed data.
@@ -19,7 +18,7 @@ def k_prototypes_distance(
         x_num: Numeric feature matrix of shape (n_samples, n_numeric_features).
         x_cat: Categorical feature matrix of shape (n_samples, n_categorical_features).
         gamma: Weight parameter for categorical distance component.
-        num_scale: Whether to standardize numeric features.
+        standardize_num_scales: Whether to standardize numeric features.
         dtype: Output data type for the distance matrix.
 
     Returns:
@@ -38,17 +37,17 @@ def k_prototypes_distance(
     # Numeric distance computation
     if x_num_array.size > 0:
         # Standardize numeric features if required
-        if num_scale:
+        if standardize_num_scales:
             mu = x_num_array.mean(axis=0)
             sd = x_num_array.std(axis=0, ddof=0)
             sd[sd == 0] = 1.0
-            x_num_scaled = (x_num_array - mu) / sd
+            x_standardize_num_scalesd = (x_num_array - mu) / sd
         else:
-            x_num_scaled = x_num_array
+            x_standardize_num_scalesd = x_num_array
 
         # Vectorized squared Euclidean distance
-        squared_norms = np.sum(x_num_scaled * x_num_scaled, axis=1, keepdims=True)
-        d_num = squared_norms + squared_norms.T - 2.0 * (x_num_scaled @ x_num_scaled.T)
+        squared_norms = np.sum(x_standardize_num_scalesd * x_standardize_num_scalesd, axis=1, keepdims=True)
+        d_num = squared_norms + squared_norms.T - 2.0 * (x_standardize_num_scalesd @ x_standardize_num_scalesd.T)
         d_num = np.maximum(d_num, 0.0)
     else:
         d_num = np.zeros((n, n), dtype=np.float64)
@@ -80,40 +79,17 @@ def k_prototypes_distance(
     return d_combined
 
 
-def kproto_silhouette_scorer(
-    gamma: float = 1.0,
-    num_scale: bool = True,
-    dtype: npt.DTypeLike = np.float32,
-) -> Callable[[Any, tuple[np.ndarray, np.ndarray], Any], float]:
-    """Scikit-compatible scorer.
+def k_prototypes_silhouette_scorer(estimator: Any, d: np.ndarray, y: Any = None) -> float:  # noqa: ARG001
+    """Compute the silhouette score for the clustering estimator.
 
     Args:
-        gamma: Weight parameter for categorical distance component.
-        num_scale: Whether to standardize numeric features.
-        dtype: Output data type for the distance matrix.
+        estimator: Fitted clustering estimator with `labels_` attribute.
+        d: Precomputed distance matrix.
+        y: Ignored. Present for API consistency.
 
     Returns:
-        A scorer function that computes the silhouette score based on k-prototypes distance.
+        Silhouette score as a float.
 
     """
-
-    def _score(estimator: Any, x: tuple[np.ndarray, np.ndarray], y: Any = None) -> float:  # noqa: ARG001
-        # X is expected to be (X_num, X_cat)
-        x_num, x_cat = x
-
-        # cluster labels from the fitted estimator
-        labels = estimator.labels_
-
-        # precomputed pairwise distances
-        d = k_prototypes_distance(
-            x_num=x_num,
-            x_cat=x_cat,
-            gamma=gamma,
-            num_scale=num_scale,
-            dtype=dtype,
-        )
-
-        # silhouette using precomputed distance matrix
-        return float(silhouette_score(d, labels, metric="precomputed"))
-
-    return _score
+    labels = estimator.labels_
+    return float(silhouette_score(d, labels, metric="precomputed"))
