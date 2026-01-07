@@ -10,7 +10,7 @@ from lib.k_medoids.model import KMedoidsWrapper
 from lib.k_medoids.transformer import GowerDistanceTransformer
 
 
-class Optimizer:
+class KMedoidsOptimizer:
     """Optimizer class for k-medoids clustering."""
 
     def __init__(self, cat_features: list[str] | None = None) -> None:
