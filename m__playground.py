@@ -8,14 +8,17 @@ app = marimo.App(width="full")
 def _():
     import importlib
     import lib.k_medoids
+    import lib.k_prototypes
     importlib.reload(lib.k_medoids)
+    importlib.reload(lib.k_prototypes)
 
     from pathlib import Path
-    from lib.k_medoids.optimizer import Optimizer
+    from lib.k_medoids.optimizer import KMedoidsOptimizer
+    from lib.k_prototypes.optimizer import KPrototypesOptimizer
     import numpy as np
     import pandas as pd
     from lib.utils import PathUtils
-    return Optimizer, Path, PathUtils, np, pd
+    return KMedoidsOptimizer, Path, PathUtils, np, pd
 
 
 @app.cell
@@ -54,20 +57,20 @@ def _(create_sample_data):
 
 
 @app.cell
-def _(Optimizer, cat_features):
-    optimizer = Optimizer(cat_features=cat_features)
+def _(KMedoidsOptimizer, cat_features, df):
+    optimizer = KMedoidsOptimizer(cat_features=cat_features)
+    best_model,dist_matrix, results_df = optimizer.optimize(df=df,n_clusters_min=2,n_clusters_max=30)
+    best_model.n_clusters
     return (optimizer,)
 
 
 @app.cell
-def _(df, optimizer):
-    best_model,dist_matrix, results_df = optimizer.optimize(df=df,n_clusters_min=2,n_clusters_max=30)
-    return (best_model,)
+def _():
+    return
 
 
 @app.cell
-def _(best_model):
-    best_model.n_clusters
+def _():
     return
 
 
