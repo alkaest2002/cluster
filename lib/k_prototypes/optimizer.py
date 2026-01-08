@@ -137,7 +137,7 @@ class KPrototypesOptimizer:
             "n_iter": model.n_iter_
         }
 
-    def check_fitted_(self) -> None:
+    def check_is_fitted_(self) -> None:
         """Check if the optimizer has been fitted.
 
         Raises:
@@ -262,7 +262,7 @@ class KPrototypesOptimizer:
 
         """
         # Ensure optimizer is fitted
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         # Ensure best_model_ is KPrototypesWrapper for type checker
         assert isinstance(self.best_model_, KPrototypesWrapper)  # nosec
@@ -371,7 +371,7 @@ class KPrototypesOptimizer:
 
         """
         # Ensure optimizer is fitted
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         # Assert best_model is KPrototypesWrapper for type checker
         assert isinstance(self.best_model_, KPrototypesWrapper)  # nosec
@@ -442,7 +442,7 @@ class KPrototypesOptimizer:
             Dictionary containing clustering summary statistics.
 
         """
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         assert isinstance(self.best_model_, KPrototypesWrapper)  # nosec
 
@@ -471,7 +471,7 @@ class KPrototypesOptimizer:
             Dictionary with best parameters.
 
         """
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         return {
             "n_clusters": self.best_n_clusters_,
@@ -486,7 +486,7 @@ class KPrototypesOptimizer:
             DataFrame with gamma performance analysis.
 
         """
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         # Group by gamma and get best silhouette for each
         gamma_analysis = (
@@ -516,7 +516,7 @@ class KPrototypesOptimizer:
             ValueError: If the optimizer has not been fitted yet.
 
         """
-        self.check_fitted_()
+        self.check_is_fitted_()
         return self.df.copy()
 
     def get_cluster_profiles(self) -> pd.DataFrame:
@@ -526,7 +526,7 @@ class KPrototypesOptimizer:
             DataFrame with cluster profiles including means, modes, and counts.
 
         """
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         profiles = []
 

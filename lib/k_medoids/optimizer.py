@@ -90,7 +90,7 @@ class KMedoidsOptimizer:
             "silhouette": model.silhouette_score_
         }
 
-    def check_fitted_(self) -> None:
+    def check_is_fitted_(self) -> None:
         """Check if the analyzer has been fitted.
 
         Raises:
@@ -190,7 +190,7 @@ class KMedoidsOptimizer:
         """
         # Ensure analyzer is fitted
         # If error is not raise, subsequent code can safely assume best_model_ is set
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         # Ensure best_model_ is KMedoidsWrapper for type checker
         assert isinstance(self.best_model_, KMedoidsWrapper)  # nosec
@@ -240,7 +240,7 @@ class KMedoidsOptimizer:
         """
         # Ensure analyzer is fitted
         # If error is not raise, subsequent code can safely assume best_model_ is set
-        self.check_fitted_()
+        self.check_is_fitted_()
 
         # Assert best_model is KMedoidsWrapper for type checker
         assert isinstance(self.best_model_, KMedoidsWrapper)  # nosec
