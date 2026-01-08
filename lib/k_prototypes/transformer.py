@@ -39,13 +39,8 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
         self.transformer_: ColumnTransformer | None = None
         self.float_columns_: list[str] | None = None
 
-    @staticmethod
-    def check_is_fitted_(instance: Any, attributes: list[str]) -> None:
+    def check_is_fitted_(self) -> None:
         """Check if the estimator instance is fitted by verifying the presence of attributes.
-
-        Args:
-            instance: The estimator instance to check.
-            attributes: List of attribute names that should be present if fitted.
 
         Returns:
             None
@@ -54,15 +49,9 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
             ValueError: If any of the specified attributes are not found in the instance.
 
         """
-        # Identify missing attributes
-        missing_attrs = [attr for attr in attributes if not hasattr(instance, attr)]
-
         # If any attributes are missing, raise ValueError
-        if missing_attrs:
-            error_msg = (
-                f"This {instance.__class__.__name__} instance is not fitted yet. "
-                f"Missing attributes: {missing_attrs}"
-            )
+        if not hasattr(self, "transformer_"):
+            error_msg = (f"This {self.__class__.__name__} instance is not fitted yet. ")
             raise ValueError(error_msg)
 
     def fit(self, x: pd.DataFrame, y: Any = None) -> NumericPreprocessor:  # noqa: ARG002
@@ -137,7 +126,7 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
 
         """
         # Check if transformer is fitted
-        self.check_is_fitted_(self, ["transformer_"])
+        self.check_is_fitted_()
 
         # Assert transformer_ is not None for type checkers
         assert self.transformer_ is not None  # nosec
@@ -182,7 +171,7 @@ class NumericPreprocessor(BaseEstimator, TransformerMixin):
 
         """
         # Check if transformer is fitted
-        self.check_is_fitted_(self, ["transformer_"])
+        self.check_is_fitted_()
 
         # Assert transformer_ is not None for type checkers
         assert self.transformer_ is not None  # nosec
