@@ -36,6 +36,21 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
         self.cat_features: list[str] | None = cat_features
         self.cat_features_bool_: NDArray[np.bool_] | None = None
 
+    def check_is_fitted_(self) -> None:
+        """Check if the estimator instance is fitted by verifying the presence of attributes.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If any of the specified attributes are not found in the instance.
+
+        """
+        # If any attributes are missing, raise ValueError
+        if not hasattr(self, "cat_features_bool_"):
+            error_msg: str = (f"This {self.__class__.__name__} instance is not fitted yet. ")
+            raise ValueError(error_msg)
+
     def fit(self, x: pd.DataFrame, y: Any = None) -> GowerDistanceTransformer:  # noqa: ARG002
         """Fit the transformer to the data.
 
@@ -99,6 +114,9 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             RuntimeError: If Gower distance calculation fails.
 
         """
+        # Check if transformer is fitted
+        self.check_is_fitted_()
+
         try:
             # Compute Gower distance matrix
             dist_matrix: NDArray[np.floating] = gower.gower_matrix(x, cat_features=self.cat_features_bool_)
