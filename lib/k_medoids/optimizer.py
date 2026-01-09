@@ -46,14 +46,14 @@ class KMedoidsOptimizer:
             TypeError: If unsupported dtypes are found in the DataFrame.
 
         """
-        # Identify unsupported dtypes in DataFrame
-        unsupported_dtypes: pd.DataFrame = df.select_dtypes(exclude=["number", "object"])
+        # No missing values allowed
+        if df.isnull().values.any():
+            error_msg: str = "Input DataFrame contains missing values. Please handle them before proceeding."
+            raise ValueError(error_msg)
 
-        # If any unsupported dtypes are found in DataFrame
-        if not unsupported_dtypes.empty:
-            # Set error message
-            error_msg: str = f"Unsupported Dtypes in DataFrame: {unsupported_dtypes.dtypes.to_dict()}"
-            # Raise TypeError
+        # No unsupported dtypes allowed
+        if not df.select_dtypes(exclude=["number", "object"]).empty:
+            error_msg = "Unsupported Dtypes in DataFrame. Only numeric and categorical types are supported."
             raise TypeError(error_msg)
 
     @staticmethod
