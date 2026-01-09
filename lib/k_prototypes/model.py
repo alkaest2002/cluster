@@ -121,157 +121,93 @@ class KPrototypesWrapper(BaseEstimator, ClusterMixin):
             error_msg = "Numeric and categorical data must have same number of samples."
             raise ValueError(error_msg)
 
-    def fit(
-        self,
-        x: tuple[pd.DataFrame, pd.DataFrame],
-        y: Any = None  # noqa: ARG002
-    ) -> KPrototypesWrapper:
-        """Fit the k-prototypes clustering algorithm.
+    def fit(self, X: pd.DataFrame) -> KPrototypesWrapper:  # ignore[mypy-note]
+        """Fit the K-Prototypes clustering to the data.
 
         Args:
-            x: Tuple of (numeric_features_df, categorical_features_df).
-            y: Ignored. Present for API consistency.
+            X: Input DataFrame with mixed numeric and categorical features.
 
         Returns:
             Self for method chaining.
 
         Raises:
-            ValueError: If input data is invalid or clustering fails.
+            ValueError: If input data is invalid.
 
         """
-        try:
-            numeric_df, categorical_df = x
+        # Store feature information
+        self.numeric_features_ = X.select_dtypes(include=[np.number]).columns.tolist()
+        self.categorical_features_ = X.select_dtypes(include=["object"]).columns.tolist()
 
-            # Validate input
-            self.validate_input_data_(numeric_df, categorical_df)
+        # Validate we have at least some data
+        if not self.numeric_features_ and not self.categorical_features_:
+            error_msg: str = "DataFrame must contain at least one numeric or categorical column."
+            raise ValueError(error_msg)
 
-            # Store feature names
-            self.numeric_features_ = numeric_df.columns.tolist()
-            self.categorical_features_ = categorical_df.columns.tolist()
+        # Identify categorical column indices for kmodes
+        categorical_indices: list[int] = [X.columns.get_loc(col) for col in self.categorical_features_]
 
-            # Convert to numpy for kmodes computation
-            x_num = numeric_df.values.astype(np.float64) if not numeric_df.empty else np.array([])
-            x_cat = categorical_df.values if not categorical_df.empty else np.array([])
+        # Fit the k-prototypes model
+        self.kprototypes_.fit(X.values, categorical=categorical_indices)
 
-            # Prepare data for kmodes (expects single array with categorical indices)
-            if x_num.size > 0 and x_cat.size > 0:
-                # Combine numeric and categorical data
-                combined_data = np.column_stack([x_num, x_cat])
-                categorical_indices = list(range(x_num.shape[1], combined_data.shape[1]))
-            elif x_num.size > 0:
-                # Only numeric data
-                combined_data = x_num
-                categorical_indices = []
-            else:
-                # Only categorical data
-                combined_data = x_cat
-                categorical_indices = list(range(x_cat.shape[1]))
+        # Extract results
+        self.labels_ = pd.Series(self.kprototypes_.labels_, index=X.index, dtype=np.int32)
+        self.cluster_centroids_ = self.kprototypes_.cluster_centroids_
+        self.cost_ = float(self.kprototypes_.cost_)
+        self.n_iter_ = int(self.kprototypes_.n_iter_)
 
-            # Fit the model
-            self.kprototypes_.fit(combined_data, categorical=categorical_indices)
+        # Calculate silhouette score
+        x_numeric: NDArray[np.float64] = (
+            X[self.numeric_features_].values
+            if self.numeric_features_
+            else np.array([]).reshape(len(X), 0)
+        )
+        x_categorical: NDArray[Any] = (
+            X[self.categorical_features_].values
+            if self.categorical_features_
+            else np.array([]).reshape(len(X), 0)
+        )
 
-            # Store results as pandas Series with original index
-            n_samples = len(numeric_df) if not numeric_df.empty else len(categorical_df)
-            index = numeric_df.index if not numeric_df.empty else categorical_df.index
+        distance_matrix = k_prototypes_distance(
+            x_num=x_numeric,
+            x_cat=x_categorical,
+            gamma=self.gamma,
+            standardize_num_scales=True
+        )
 
-            self.labels_ = pd.Series(
-                self.kprototypes_.labels_.astype(np.int32),
-                index=index,
-                name="cluster"
-            )
-            self.cluster_centroids_ = self.kprototypes_.cluster_centroids_
-            self.cost_ = self.kprototypes_.cost_
-            self.n_iter_ = self.kprototypes_.n_iter_
-
-            # Calculate silhouette score using k-prototypes distance
-            if len(self.labels_.unique()) > 1:
-                # Use our custom distance function for silhouette score
-                distance_matrix = k_prototypes_distance(
-                    x_num=x_num,
-                    x_cat=x_cat,
-                    gamma=self.gamma,
-                    standardize_num_scales=True,
-                )
-                self.silhouette_score_ = k_prototypes_silhouette_scorer(self, distance_matrix)
-            else:
-                self.silhouette_score_ = -1.0
-
-        except Exception:
-            # Handle clustering failure gracefully
-            n_samples = len(numeric_df) if not numeric_df.empty else len(categorical_df)
-            index = numeric_df.index if not numeric_df.empty else categorical_df.index
-
-            self.labels_ = pd.Series(
-                np.zeros(n_samples, dtype=np.int32),
-                index=index,
-                name="cluster"
-            )
-            self.cluster_centroids_ = []
-            self.cost_ = np.inf
-            self.n_iter_ = 0
-            self.silhouette_score_ = -1.0
+        self.silhouette_score_ = k_prototypes_silhouette_scorer(self, distance_matrix)
 
         return self
 
-    def predict(
-        self,
-        x: tuple[pd.DataFrame, pd.DataFrame]
-    ) -> pd.Series:
-        """Predict cluster labels for new data.
+    def predict(self, X: pd.DataFrame) -> pd.Series:
+        """Predict cluster labels for new data points.
 
         Args:
-            x: Tuple of (numeric_features_df, categorical_features_df).
+            X: Input DataFrame with mixed numeric and categorical features.
 
         Returns:
-            Predicted cluster labels as pandas Series.
+            Series with cluster labels for each sample.
 
         Raises:
-            AttributeError: If the model has not been fitted yet.
+            ValueError: If model is not fitted or input data is incompatible.
 
         """
-        if len(self.labels_) == 0:
-            error_msg: str = "Model must be fitted before making predictions."
-            raise AttributeError(error_msg)
+        # Check if model is fitted
+        if not hasattr(self.kprototypes_, "cluster_centroids_"):
+            error_msg: str = "Model must be fitted before calling predict."
+            raise ValueError(error_msg)
 
-        numeric_df, categorical_df = x
+        # Validate feature consistency
+        numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = X.select_dtypes(include=["object"]).columns.tolist()
 
-        # Convert to numpy for prediction
-        x_num = numeric_df.values.astype(np.float64) if not numeric_df.empty else np.array([])
-        x_cat = categorical_df.values if not categorical_df.empty else np.array([])
+        if numeric_cols != self.numeric_features_ or categorical_cols != self.categorical_features_:
+            error_msg = "Input features don't match training data."
+            raise ValueError(error_msg)
 
-        # Prepare data same way as in fit
-        if x_num.size > 0 and x_cat.size > 0:
-            combined_data = np.column_stack([x_num, x_cat])
-            categorical_indices = list(range(x_num.shape[1], combined_data.shape[1]))
-        elif x_num.size > 0:
-            combined_data = x_num
-            categorical_indices = []
-        else:
-            combined_data = x_cat
-            categorical_indices = list(range(x_cat.shape[1]))
+        # Identify categorical column indices
+        categorical_indices = [X.columns.get_loc(col) for col in self.categorical_features_]
 
-        predictions = self.kprototypes_.predict(
-            combined_data,
-            categorical=categorical_indices
-        ).astype(np.int32)
+        # Predict cluster labels
+        labels = self.kprototypes_.predict(X.values, categorical=categorical_indices)
 
-        # Return as pandas Series with original index
-        index = numeric_df.index if not numeric_df.empty else categorical_df.index
-        return pd.Series(predictions, index=index, name="cluster")
-
-    def fit_predict(
-        self,
-        x: tuple[pd.DataFrame, pd.DataFrame],
-        y: Any = None
-    ) -> pd.Series:
-        """Fit the model and predict cluster labels.
-
-        Args:
-            x: Tuple of (numeric_features_df, categorical_features_df).
-            y: Ignored. Present for API consistency.
-
-        Returns:
-            Cluster labels for the input data as pandas Series.
-
-        """
-        return self.fit(x, y).labels_
+        return pd.Series(labels, index=X.index, dtype=np.int32)
