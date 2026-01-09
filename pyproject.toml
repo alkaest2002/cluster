@@ -82,6 +82,7 @@ ignore = [
     "D104",  # Missing docstring in public package
     "D107",  # Missing docstring in __init__
     "E501",  # Line too long (handled by formatter)
+    "N803",  # Argument name should be lowercase
 ]
 
 # Allow autofix for all enabled rules
