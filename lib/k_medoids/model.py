@@ -67,31 +67,31 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
         self.silhouette_score_: float | None = None
 
     @staticmethod
-    def validate_distance_matrix_(dist_matrix: NDArray[np.float32]) -> None:
-        """Validate the distance matrix is square and non-empty.
+    def validate_distance_matrix_(X: NDArray[np.float32]) -> None:
+        """Validate the distance matrix is non-empty and square.
 
         Args:
-            dist_matrix: Distance matrix to validate.
+            X: Distance matrix to validate.
 
         Raises:
             ValueError: If the distance matrix is not square or is empty.
 
         """
         # Check if distance matrix is empty
-        if dist_matrix.size == 0:
+        if X.size == 0:
             error_msg: str = "Distance matrix is empty."
             raise ValueError(error_msg)
 
         # Check if distance matrix is square
-        if dist_matrix.shape[0] != dist_matrix.shape[1]:
+        if X.shape[0] != X.shape[1]:
             error_msg = "Distance matrix must be square."
             raise ValueError(error_msg)
 
-    def fit(self, x: NDArray[np.floating], y: Any = None) -> KMedoidsWrapper:  # noqa: ARG002
+    def fit(self, X: NDArray[np.floating], y: Any = None) -> KMedoidsWrapper:  # noqa: ARG002
         """Fit the k-medoids clustering algorithm.
 
         Args:
-            x: Precomputed square distance matrix of shape (n_samples, n_samples).
+            X: Precomputed square distance matrix of shape (n_samples, n_samples).
             y: Ignored. Present for API consistency.
 
         Returns:
@@ -100,7 +100,7 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
         """
         try:
             # Fit model
-            self.kmedoids_.fit(x)
+            self.kmedoids_.fit(X)
 
             # Store attributes
             self.labels_ = self.kmedoids_.labels_
@@ -109,23 +109,23 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
 
             # Calculate Scores
             if len(np.unique(self.labels_)) > 1:
-                self.silhouette_score_ = silhouette_score(x, self.labels_, metric="precomputed")
+                self.silhouette_score_ = silhouette_score(X, self.labels_, metric="precomputed")
             else:
                 self.silhouette_score_ = -1.0
 
         except Exception:
-            self.labels_ = np.zeros(x.shape[0], dtype=np.int32)
+            self.labels_ = np.zeros(X.shape[0], dtype=np.int32)
             self.medoid_indices_ = np.array([], dtype=np.int32)
             self.inertia_ = np.inf
             self.silhouette_score_ = -1.0
 
         return self
 
-    def predict(self, x: NDArray[np.floating]) -> Any:
+    def predict(self, X: NDArray[np.floating]) -> Any:
         """Predict the closest cluster for new samples.
 
         Args:
-            x: New samples to predict clusters for.
+            X: New samples to predict clusters for.
 
         Returns:
             Cluster labels for the new samples.
@@ -138,4 +138,4 @@ class KMedoidsWrapper(BaseEstimator, ClusterMixin):
             error_msg: str = "Model must be fitted before making predictions."
             raise AttributeError(error_msg)
 
-        return self.kmedoids_.predict(x)
+        return self.kmedoids_.predict(X)
