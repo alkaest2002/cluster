@@ -51,14 +51,14 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             error_msg: str = (f"This {self.__class__.__name__} instance is not fitted yet. ")
             raise ValueError(error_msg)
 
-    def fit(self, x: pd.DataFrame, y: Any = None) -> GowerDistanceTransformer:  # noqa: ARG002
+    def fit(self, X: pd.DataFrame, y: Any = None) -> GowerDistanceTransformer:  # noqa: ARG002
         """Fit the transformer to the data.
 
         Determines which features are categorical based on the cat_features parameter
         or by auto-detecting object columns in DataFrames.
 
         Args:
-            x: Input data to fit the transformer on.
+            X: Input data to fit the transformer on.
             y: Ignored. Present for API consistency.
 
         Returns:
@@ -73,39 +73,39 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
         if self.cat_features is None:
 
             # Auto-detect categorical features (object dtype)
-            self.cat_features_bool_ = x.dtypes == "object"
+            self.cat_features_bool_ = X.dtypes == "object"
 
         # If categorical features are specified by name
         else:
 
             # If any specified categorical features are missing
-            if not pd.Index(self.cat_features).isin(x.columns).all():
+            if not pd.Index(self.cat_features).isin(X.columns).all():
                 # Get list of missing features
-                missing_features = [feat for feat in self.cat_features if feat not in x.columns]
+                missing_features = [feat for feat in self.cat_features if feat not in X.columns]
                 # Set error message
                 error_msg: str = f"Categorical features not found in DataFrame: {missing_features}"
                 # Raise error
                 raise ValueError(error_msg)
 
             # If any specified categorical features are not of object dtype
-            if not pd.Index(self.cat_features).isin(x.select_dtypes(include=["object"]).columns).all():
+            if not pd.Index(self.cat_features).isin(X.select_dtypes(include=["object"]).columns).all():
                 # Get list of non-object dtype features
-                non_object_features = [feat for feat in self.cat_features if x[feat].dtype != "object"]
+                non_object_features = [feat for feat in self.cat_features if X[feat].dtype != "object"]
                 # Set error message
                 error_msg = f"Specified categorical features must be of object dtype: {non_object_features}"
                 # Raise error
                 raise TypeError(error_msg)
 
             # Create boolean mask based on provided categorical feature names
-            self.cat_features_bool_ = x.columns.isin(self.cat_features)
+            self.cat_features_bool_ = X.columns.isin(self.cat_features)
 
         return self
 
-    def transform(self, x: pd.DataFrame) -> NDArray[np.float32]:
+    def transform(self, X: pd.DataFrame) -> NDArray[np.float32]:
         """Transform the input data into a Gower distance matrix.
 
         Args:
-            x: Input data to transform into a distance matrix.
+            X: Input data to transform into a distance matrix.
 
         Returns:
             Square distance matrix of shape (n_samples, n_samples) with Gower distances.
@@ -119,7 +119,7 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
 
         try:
             # Compute Gower distance matrix
-            dist_matrix: NDArray[np.floating] = gower.gower_matrix(x, cat_features=self.cat_features_bool_)
+            dist_matrix: NDArray[np.floating] = gower.gower_matrix(X, cat_features=self.cat_features_bool_)
 
             # Handle potential numerical instability
             # Set 1.0 for any NaN distances, i.e., max distance
@@ -136,20 +136,22 @@ class GowerDistanceTransformer(BaseEstimator, TransformerMixin):
             raise RuntimeError(error_msg) from e
 
     def fit_transform(
-        self, x: pd.DataFrame,
-        y: Any = None  # noqa: ARG002
-    ) -> NDArray[np.float32]:
+            self, X: pd.DataFrame,
+            y: Any = None,  # noqa: ARG002
+            **fit_params: dict[str, Any]
+        ) -> NDArray[np.float32]:
         """Fit the transformer and transform the data in one step.
 
         Args:
-            x: Input data to fit and transform.
+            X: Input data to fit and transform.
             y: Ignored. Present for API consistency.
+            fit_params: Additional fit parameters.
 
         Returns:
             NDArray[np.float32]: Gower distances matrix.
 
         """
-        return self.fit(x).transform(x)
+        return self.fit(X, **fit_params).transform(X)
 
     def get_feature_names_out(self) -> None:
         """Get output feature names for transformation.
