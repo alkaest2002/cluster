@@ -1,10 +1,13 @@
 import io
+import warnings
 from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
 from lib.k_prototypes.model import KPrototypesWrapper
+
+warnings.filterwarnings("ignore")
 
 
 class KPrototypesOptimizer:
@@ -21,16 +24,6 @@ class KPrototypesOptimizer:
             cat_features: List of categorical feature column names.
             standardize_num_scales: Whether to standardize numeric features.
 
-        Attributes:
-            df: Input DataFrame with cluster assignments.
-            results_df_: DataFrame containing optimization results.
-            cat_features: Categorical feature column names.
-            standardize_num_scales: Whether to standardize numeric features.
-            best_model_: Best k-prototypes model found during optimization.
-            best_silhouette_: Best silhouette score achieved.
-            best_gamma_: Best gamma value found.
-            best_n_clusters_: Best number of clusters found.
-
         """
         self.df: pd.DataFrame = pd.DataFrame()
         self.results_df_: pd.DataFrame = pd.DataFrame()
@@ -43,90 +36,37 @@ class KPrototypesOptimizer:
 
     @staticmethod
     def validate_dataframe_(df: pd.DataFrame) -> None:
-        """Validate that the DataFrame contains only supported dtypes.
+        """Validate that the DataFrame contains only supported dtypes."""
+        if df.isnull().values.any():
+            error_msg: str = "Input DataFrame contains missing values. Please handle them before proceeding."
+            raise ValueError(error_msg)
 
-        Args:
-            df: DataFrame to validate.
-
-        Raises:
-            TypeError: If unsupported dtypes are found in the DataFrame.
-
-        """
-        # Identify unsupported dtypes in DataFrame
-        unsupported_dtypes: pd.DataFrame = df.select_dtypes(
-            exclude=["number", "object"]
-        )
-
-        # If any unsupported dtypes are found in DataFrame
-        if not unsupported_dtypes.empty:
-            # Set error message
-            error_msg: str = (
-                f"Unsupported Dtypes in DataFrame: "
-                f"{unsupported_dtypes.dtypes.to_dict()}"
-            )
-            # Raise TypeError
+        if not df.select_dtypes(exclude=["number", "object", "category"]).empty:
+            error_msg = "DataFrame contains unsupported dtypes. Only numeric and categorical types are supported."
             raise TypeError(error_msg)
 
-    def _prepare_data(
-        self,
-        df: pd.DataFrame
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Prepare numeric and categorical DataFrames from input DataFrame.
+    def _get_categorical_indices(self, df: pd.DataFrame) -> list[int]:
+        """Get indices of categorical columns in the DataFrame."""
+        return [df.columns.get_loc(col) for col in self.cat_features if col in df.columns]
 
-        Args:
-            df: Input DataFrame.
-
-        Returns:
-            Tuple of (numeric_features_df, categorical_features_df).
-
-        """
-        # Get numeric columns (exclude categorical features)
-        numeric_columns = [col for col in df.columns if col not in self.cat_features]
-
-        # Get numeric DataFrame
-        numeric_df = df[numeric_columns].select_dtypes(include=["number"])
-
-        # Get categorical columns
-        categorical_df = (
-            df[self.cat_features]
-                if self.cat_features
-                else pd.DataFrame(index=df.index)
-        )
-
-        return numeric_df, categorical_df
-
-    @staticmethod
     def fit_model_(
+        self,
+        df: pd.DataFrame,
+        categorical_indices: list[int],
         n_clusters: int,
-        numeric_df: pd.DataFrame,
-        categorical_df: pd.DataFrame,
         gamma: float = 1.0,
         random_state: int = 42
     ) -> dict[str, Any]:
-        """Fit the k-prototypes model.
-
-        Args:
-            n_clusters: Number of clusters.
-            numeric_df: Numeric feature DataFrame.
-            categorical_df: Categorical feature DataFrame.
-            gamma: Weight parameter for categorical distance component.
-            random_state: Random state for reproducibility.
-
-        Returns:
-            Dictionary with model and metrics.
-
-        """
-        # Instantiate model
-        model: KPrototypesWrapper = KPrototypesWrapper(
+        """Fit the k-prototypes model."""
+        model = KPrototypesWrapper(
             n_clusters=n_clusters,
             gamma=gamma,
             random_state=random_state
         )
 
-        # Fit model
-        model.fit((numeric_df, categorical_df))
+        # Fit model with DataFrame
+        model.fit(df, categorical_indices, standardize=self.standardize_num_scales)
 
-        # Return results
         return {
             "model": model,
             "n_clusters": n_clusters,
@@ -138,23 +78,12 @@ class KPrototypesOptimizer:
         }
 
     def check_is_fitted_(self) -> None:
-        """Check if the optimizer has been fitted.
-
-        Raises:
-            ValueError: If the optimizer has not been fitted yet
-                or no valid clustering is found.
-
-        """
-        # Check if best_model_ is set
+        """Check if the optimizer has been fitted."""
         if self.best_model_ is None:
-            error_msg: str = "Optimizer must be fitted before analysis."
-            raise ValueError(error_msg)
+            raise ValueError("Optimizer must be fitted before analysis.")
 
-        # Raise error if all silhouette scores are -1
-        # This indicates no valid clustering was found
         if (self.results_df_["silhouette"] == -1.0).all():
-            error_msg = "No valid clustering found."
-            raise ValueError(error_msg)
+            raise ValueError("No valid clustering found.")
 
     def optimize(
         self,
@@ -163,119 +92,59 @@ class KPrototypesOptimizer:
         n_clusters_max: int = 10,
         gamma_values: list[float] | None = None
     ) -> tuple[KPrototypesWrapper, pd.DataFrame]:
-        """Run k-prototypes optimization across multiple k and gamma values.
-
-        This function evaluates k-prototypes clustering for different numbers of clusters
-        and gamma values, using silhouette score metric with k-prototypes distance.
-
-        Args:
-            df: Input DataFrame containing the data to cluster.
-            n_clusters_min: Minimum number of clusters to evaluate.
-            n_clusters_max: Maximum number of clusters to evaluate.
-            gamma_values: List of gamma values to try. If None, uses default range.
-
-        Returns:
-            Tuple containing:
-                - Best k-prototypes model
-                - DataFrame with evaluation metrics for all combinations
-
-        """
-        # Default gamma values if not provided
+        """Run k-prototypes optimization across multiple k and gamma values."""
         if gamma_values is None:
-            gamma_values = [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]
-
-        # Initialize results list
-        results: list[dict[str, int | float | None]] = []
+            gamma_values = [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0, 10.0]
 
         # Validate DataFrame
         self.validate_dataframe_(df)
-
-        # Copy DataFrame
         self.df = df.copy()
 
-        # Prepare numeric and categorical data
-        numeric_df, categorical_df = self._prepare_data(df)
+        # Get categorical indices once
+        categorical_indices = self._get_categorical_indices(df)
 
-        #######################################################################################################
-        # Grid search over n_clusters and gamma values
-        #######################################################################################################
-        best_silhouette = -1.0
-        best_model = None
-        best_params = {}
-
+        # Grid search
+        results = []
         for gamma in gamma_values:
             for n_clusters in range(n_clusters_min, n_clusters_max + 1):
-
-                # Fit model
-                model_dict: dict[str, Any] = self.fit_model_(
+                model_dict = self.fit_model_(
+                    df=df,
+                    categorical_indices=categorical_indices,
                     n_clusters=n_clusters,
-                    numeric_df=numeric_df,
-                    categorical_df=categorical_df,
                     gamma=gamma,
                     random_state=42
                 )
 
-                # Append to results list
                 results.append(model_dict)
 
                 # Track best model
-                current_silhouette = model_dict["silhouette"]
-                if current_silhouette > best_silhouette:
-                    best_silhouette = current_silhouette
-                    best_model = model_dict["model"]
-                    best_params = {
-                        "gamma": gamma,
-                        "n_clusters": n_clusters,
-                        "silhouette": current_silhouette
-                    }
+                if model_dict["silhouette"] > self.best_silhouette_:
+                    self.best_model_ = model_dict["model"]
+                    self.best_silhouette_ = model_dict["silhouette"]
+                    self.best_gamma_ = model_dict["gamma"]
+                    self.best_n_clusters_ = model_dict["n_clusters"]
 
-        # Convert results to DataFrame
         self.results_df_ = pd.DataFrame(results)
 
-        # Store best model related attributes
-        self.best_model_ = best_model
-        self.best_silhouette_ = best_params["silhouette"]
-        self.best_gamma_ = best_params["gamma"]
-        self.best_n_clusters_ = best_params["n_clusters"]
-
-        # Assert best_model_ is not None for type checker
-        assert self.best_model_ is not None  # nosec
-
-        # Assign cluster labels from best model to original DataFrame
-        self.df = self.df.assign(cluster=self.best_model_.labels_)
-
-        # Add cluster size using groupby transform
+        # Add cluster assignments to original data
+        assert self.best_model_ is not None
         self.df = self.df.assign(
-            cluster_size=self.df.groupby("cluster")["cluster"].transform("size")
+            cluster=pd.Series(self.best_model_.labels_, index=self.df.index),
+            cluster_size=lambda x: x.groupby("cluster").size().loc[x["cluster"]].values
         )
 
         return self.best_model_, self.results_df_.drop(columns=["model"])
 
     def get_plots(self) -> list[str]:
-        """Plot silhouette scores for different k and gamma values.
-
-        Returns:
-            list[str]: List containing SVG strings of the plots.
-
-        Raises:
-            ValueError: If no results are available to plot.
-
-        """
-        # Ensure optimizer is fitted
+        """Plot silhouette scores for different k and gamma values."""
         self.check_is_fitted_()
 
-        # Ensure best_model_ is KPrototypesWrapper for type checker
-        assert isinstance(self.best_model_, KPrototypesWrapper)  # nosec
-
-        # Get results DataFrame
-        data: pd.DataFrame = self.results_df_
+        data = self.results_df_
 
         # Create subplots
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
-        #######################################################################################################
         # Plot 1: Silhouette scores by n_clusters for best gamma
-        #######################################################################################################
         best_gamma_data = data[data["gamma"] == self.best_gamma_]
 
         ax1.plot(
@@ -296,9 +165,7 @@ class KPrototypesOptimizer:
         ax1.legend()
         ax1.grid(axis="y", alpha=0.3)
 
-        #######################################################################################################
         # Plot 2: Heatmap of silhouette scores by n_clusters and gamma
-        #######################################################################################################
         pivot_data = data.pivot(
             index="gamma",
             columns="n_clusters",
@@ -337,13 +204,10 @@ class KPrototypesOptimizer:
         )
         ax2.legend()
 
-        # Adjust layout
         plt.tight_layout()
 
-        # Initialize an in-memory buffer
-        buffer: io.BytesIO = io.BytesIO()
-
-        # Save figure to the buffer in SVG format then close it
+        # Save to buffer
+        buffer = io.BytesIO()
         fig.savefig(
             buffer,
             format="svg",
@@ -351,33 +215,17 @@ class KPrototypesOptimizer:
             transparent=True,
             pad_inches=0.05
         )
-
-        # Close figure
         plt.close(fig)
 
-        # Retrieve SVG string from buffer
         buffer.seek(0)
-        svg_content: str = buffer.getvalue().decode()
+        svg_content = buffer.getvalue().decode()
         buffer.close()
 
         return [svg_content]
 
     def get_analysis(self) -> pd.DataFrame:
-        """Analyze the fitted k-prototypes model and return cluster centers info.
-
-        Returns:
-            pd.DataFrame: DataFrame with cluster analysis including centroids
-                and representative samples.
-
-        """
-        # Ensure optimizer is fitted
+        """Analyze the fitted k-prototypes model and return cluster centers info."""
         self.check_is_fitted_()
-
-        # Assert best_model is KPrototypesWrapper for type checker
-        assert isinstance(self.best_model_, KPrototypesWrapper)  # nosec
-
-        # Get cluster centroids
-        centroids = self.best_model_.cluster_centroids_
 
         analysis_data = []
 
@@ -386,67 +234,39 @@ class KPrototypesOptimizer:
             cluster_size = cluster_mask.sum()
 
             # Get centroid information
+            centroids = self.best_model_.cluster_centroids_
             if centroids and len(centroids) > cluster_id:
                 numeric_centroid = (
-                    centroids[cluster_id][0]
-                    if len(centroids[cluster_id]) > 0
-                    else None
+                    centroids[cluster_id][0] if len(centroids[cluster_id]) > 0 else None
                 )
                 categorical_centroid = (
-                    centroids[cluster_id][1]
-                    if len(centroids[cluster_id]) > 1
-                    else None
+                    centroids[cluster_id][1] if len(centroids[cluster_id]) > 1 else None
                 )
             else:
                 numeric_centroid = None
                 categorical_centroid = None
 
-            # Find a representative point (first point in cluster)
+            # Find representative point (closest to centroid or first point)
             cluster_points = self.df[cluster_mask]
             representative_idx = (
-                cluster_points.index[0]
-                if len(cluster_points) > 0
-                else None
+                cluster_points.index[0] if len(cluster_points) > 0 else None
             )
 
             analysis_data.append({
                 "cluster": cluster_id,
                 "size": cluster_size,
+                "percentage": (cluster_size / len(self.df)) * 100,
                 "representative_idx": representative_idx,
                 "numeric_centroid": numeric_centroid,
                 "categorical_centroid": categorical_centroid
             })
 
-        analysis_df = pd.DataFrame(analysis_data)
-
-        # Add representative points data
-        if not analysis_df.empty and analysis_df["representative_idx"].notna().any():
-            representative_points = []
-            for _, row in analysis_df.iterrows():
-                if pd.notna(row["representative_idx"]):
-                    rep_point = self.df.loc[row["representative_idx"]].to_dict()
-                    rep_point["cluster"] = row["cluster"]
-                    rep_point["cluster_size"] = row["size"]
-                    representative_points.append(rep_point)
-
-            if representative_points:
-                return pd.DataFrame(representative_points)
-
-        # Fallback: return cluster summary
-        return analysis_df
+        return pd.DataFrame(analysis_data)
 
     def get_cluster_summary(self) -> dict[str, Any]:
-        """Get a summary of the clustering results.
-
-        Returns:
-            Dictionary containing clustering summary statistics.
-
-        """
+        """Get a summary of the clustering results."""
         self.check_is_fitted_()
 
-        assert isinstance(self.best_model_, KPrototypesWrapper)  # nosec
-
-        # Get cluster sizes using value_counts
         cluster_sizes = self.df["cluster"].value_counts().sort_index().to_dict()
 
         return {
@@ -465,12 +285,7 @@ class KPrototypesOptimizer:
         }
 
     def get_best_params(self) -> dict[str, Any]:
-        """Get the best parameters found during optimization.
-
-        Returns:
-            Dictionary with best parameters.
-
-        """
+        """Get the best parameters found during optimization."""
         self.check_is_fitted_()
 
         return {
@@ -480,15 +295,9 @@ class KPrototypesOptimizer:
         }
 
     def get_gamma_analysis(self) -> pd.DataFrame:
-        """Get analysis of gamma values performance.
-
-        Returns:
-            DataFrame with gamma performance analysis.
-
-        """
+        """Get analysis of gamma values performance."""
         self.check_is_fitted_()
 
-        # Group by gamma and get best silhouette for each
         gamma_analysis = (
             self.results_df_
             .groupby("gamma")["silhouette"]
@@ -507,25 +316,12 @@ class KPrototypesOptimizer:
         return gamma_analysis.sort_values("best_silhouette", ascending=False)
 
     def get_clustered_data(self) -> pd.DataFrame:
-        """Get the original data with cluster assignments.
-
-        Returns:
-            DataFrame with original data plus cluster and cluster_size columns.
-
-        Raises:
-            ValueError: If the optimizer has not been fitted yet.
-
-        """
+        """Get the original data with cluster assignments."""
         self.check_is_fitted_()
         return self.df.copy()
 
     def get_cluster_profiles(self) -> pd.DataFrame:
-        """Get statistical profiles for each cluster.
-
-        Returns:
-            DataFrame with cluster profiles including means, modes, and counts.
-
-        """
+        """Get statistical profiles for each cluster."""
         self.check_is_fitted_()
 
         profiles = []
@@ -543,12 +339,13 @@ class KPrototypesOptimizer:
             numeric_cols = [
                 col for col in cluster_data.columns
                 if col not in {*self.cat_features, "cluster", "cluster_size"}
+                and pd.api.types.is_numeric_dtype(cluster_data[col])
             ]
+
             for col in numeric_cols:
-                if pd.api.types.is_numeric_dtype(cluster_data[col]):
-                    profile[f"{col}_mean"] = cluster_data[col].mean()
-                    profile[f"{col}_median"] = cluster_data[col].median()
-                    profile[f"{col}_std"] = cluster_data[col].std()
+                profile[f"{col}_mean"] = cluster_data[col].mean()
+                profile[f"{col}_median"] = cluster_data[col].median()
+                profile[f"{col}_std"] = cluster_data[col].std()
 
             # Add categorical feature modes
             for col in self.cat_features:
